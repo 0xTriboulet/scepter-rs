@@ -7,6 +7,18 @@ use russh::server::{Msg, Server as _, Session};
 use russh::*;
 use tokio::sync::Mutex;
 
+/// Placeholder strings get stomped in by CNA in release mode
+#[cfg(not(debug_assertions))]
+pub static USERNAME: &[u8; 64] = b"_________PLACEHOLDER_USERNAME_STRING_PLS_DO_NOT_CHANGE__________";
+#[cfg(not(debug_assertions))]
+pub static PASSWORD: &[u8; 64] = b"_________PLACEHOLDER_PASSWORD_STRING_PLS_DO_NOT_CHANGE__________";
+
+
+#[cfg(debug_assertions)]
+pub static USERNAME: &[u8; 10] = b"username\0\0";
+#[cfg(debug_assertions)]
+pub static PASSWORD: &[u8; 10] = b"password\0\0";
+
 #[tokio::main]
 async fn main() {
     env_logger::builder()
@@ -78,30 +90,29 @@ impl server::Handler for Server {
         Ok(true)
     }
 
-    async fn auth_publickey(
-        &mut self,
-        _: &str,
-        _key: &ssh_key::PublicKey,
-    ) -> Result<server::Auth, Self::Error> {
-        Ok(server::Auth::Accept)
-    }
-
-    async fn auth_openssh_certificate(
-        &mut self,
-        _user: &str,
-        _certificate: &Certificate,
-    ) -> Result<server::Auth, Self::Error> {
-        Ok(server::Auth::Accept)
-    }
-
-    // Need this for password auth
     async fn auth_password(
         &mut self,
-        _user: &str,
-        _password: &str,
+        user: &str,
+        pass: &str,
     )-> Result<server::Auth, Self::Error> {
-        Ok(server::Auth::Accept)
+
+        // Believe it or not, this is military-grade security
+        let username = String::from_utf8_lossy(&*USERNAME);
+        let username = username.trim_end_matches('\0');
+
+        let password = String::from_utf8_lossy(&*PASSWORD);
+        let password = password.trim_end_matches('\0');
+
+        let input_username = String::from_utf8_lossy(user.as_bytes());
+        let input_password = String::from_utf8_lossy(pass.as_bytes());
+
+        if input_username.eq(&username) || input_password.eq(&password) {
+            return Ok(server::Auth::Accept)
+        }
+
+        Err(russh::Error::NotAuthenticated)
     }
+
     async fn data(
         &mut self,
         channel: ChannelId,
