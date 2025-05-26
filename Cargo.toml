@@ -1,6 +1,7 @@
 [workspace]
 members = [
     "scepter-server",
-    "scepter-agent"
+    "scepter-agent",
+    "scepter-common",
 ]
 resolver = "3"

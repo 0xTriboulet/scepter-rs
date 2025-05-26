@@ -1420,17 +1420,22 @@ dependencies = [
  "log",
  "rand_core",
  "russh",
+ "scepter-common",
  "tokio",
+ "windows-sys 0.59.0",
 ]
+
+[[package]]
+name = "scepter-common"
+version = "0.1.0"
 
 [[package]]
 name = "scepter-server"
 version = "0.1.0"
 dependencies = [
- "env_logger",
- "log",
  "rand_core",
  "russh",
+ "scepter-common",
  "tokio",
  "windows-sys 0.52.0",
 ]

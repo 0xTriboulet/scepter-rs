@@ -3,9 +3,20 @@ name = "scepter-agent"
 version = "0.1.0"
 edition = "2024"
 
+[lib]
+name = "scepter_agent"
+crate-type = ["cdylib", "rlib"]
+path = "src/lib.rs"
+
+[[bin]]
+name = "scepter-agent"
+path = "src/main.rs"
+
 [dependencies]
+scepter-common = { path = "../scepter-common" }
 russh = "0.52.1"
 rand_core = "0.6.4"
 tokio = "1.45.0"
 env_logger = "0.11.8"
 log = "0.4.27"
+windows-sys = "0.59.0"

