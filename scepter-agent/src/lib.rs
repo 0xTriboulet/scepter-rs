@@ -121,7 +121,7 @@ pub async fn dll_main() {
     let config = Arc::new(config);
     let sh = Client {};
 
-    let interface_ip = String::from_utf8_lossy(SSH_CONNECT_IPV4_ADDRESS)
+    let ssh_server_ip = String::from_utf8_lossy(SSH_CONNECT_IPV4_ADDRESS)
         .to_string()
         .trim_matches(char::from(0))
         .to_string();
@@ -129,7 +129,7 @@ pub async fn dll_main() {
         .to_string()
         .trim_matches(char::from(0))
         .to_string();
-    let addrs = format!("{}:{}", interface_ip, ssh_port);
+    let addrs = format!("{}:{}", ssh_server_ip, ssh_port);
 
     debug_println!("Connecting to {}", addrs);
 
