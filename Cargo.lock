@@ -1435,6 +1435,10 @@ dependencies = [
 [[package]]
 name = "scepter-common"
 version = "0.1.0"
+dependencies = [
+ "debug_print",
+ "windows-sys 0.59.0",
+]
 
 [[package]]
 name = "scepter-server"
@@ -1445,7 +1449,7 @@ dependencies = [
  "russh",
  "scepter-common",
  "tokio",
- "windows-sys 0.52.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -2018,6 +2022,10 @@ name = "windows_x86_64_msvc"
 version = "0.52.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "589f6da84c646204747d1270a2a5661ea66ed1cced2631d546fdfb155959f9ec"
+
+[[package]]
+name = "xtask"
+version = "0.1.0"
 
 [[package]]
 name = "zerocopy"

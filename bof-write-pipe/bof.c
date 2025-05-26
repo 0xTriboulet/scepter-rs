@@ -1,5 +1,10 @@
-#include <Windows.h>
+/* This BOF is responsible to writing to the pipe that scepter-server is listening on.
+* This mechanism is what allows user inputs from the Beacon console to be passed to the
+* server, and the server then forwards these inputs to connect agent(s).
+*/
 
+#include <Windows.h>
+#include "beacon.h"
 // Real pipe name is stomped in by cna
  static const char pipename[] = "\\\\.\\pipe\\INPUT_PIPE_NAME_NO_CHANGE_PLS\0\0\0\0";
 
