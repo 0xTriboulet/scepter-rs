@@ -1,6 +1,6 @@
 import beacon.CommandBuilder;
 
-global('$ssh_inited $pipe_wait $pipe_output_name_final $pipe_input_name_final $pipe_output_stomp_me_name $pipe_input_stomp_me_name $ssh_ip_stomp_me $ssh_username_stomp_me $ssh_password_stomp_me');
+global('$ssh_inited $pipe_wait $pipe_output_name_final $pipe_input_name_final $pipe_output_stomp_me_name $pipe_input_stomp_me_name $ssh_ip_stomp_me $ssh_ip_connect_stomp_me $ssh_port_stomp_me $ssh_username_stomp_me $ssh_password_stomp_me');
 $ssh_inited = -1;
 $pipe_output_name_final = "BigGasPipe_updates_1"; # Change the pipe name an reload the CNA for 'opsec', 28-bytes MAX
 $pipe_input_name_final = "BigGasPipe_updates_2"; # Change the pipe name an reload the CNA for 'opsec', 28-bytes MAX
@@ -8,9 +8,12 @@ $pipe_input_name_final = "BigGasPipe_updates_2"; # Change the pipe name an reloa
 $pipe_output_stomp_me_name = "OUTPUT_PIPE_NAME_NO_CHANGE_PLS";
 $pipe_input_stomp_me_name = "INPUT_PIPE_NAME_NO_CHANGE_PLS";
 
-$ssh_ip_stomp_me = "999.999.999.999";
-$ssh_username_stomp_me = "USERNAME_STRING_NO_CHANGE_PLS_USERNAME_STRING_NO_CHANGE_PLS_____";
-$ssh_password_stomp_me = "PASSWORD_STRING_NO_CHANGE_PLS_PASSWORD_STRING_NO_CHANGE_PLS_____";
+$ssh_ip_stomp_me = "999.999.999.999"; # interface IP, 0.0.0.0 by default
+$ssh_port_stomp_me = "99999";
+
+$ssh_ip_connect_stomp_me = "888.888.888.888"; # this is the ip that gets stomped into the agent
+$ssh_username_stomp_me = "_________PLACEHOLDER_USERNAME_STRING_PLS_DO_NOT_CHANGE__________";
+$ssh_password_stomp_me = "_________PLACEHOLDER_PASSWORD_STRING_PLS_DO_NOT_CHANGE__________";
 
 $pipe_wait = 30000; # Custom timeout
 

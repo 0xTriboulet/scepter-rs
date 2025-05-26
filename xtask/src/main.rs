@@ -102,5 +102,15 @@ fn main() {
         exit(1);
     }
 
+    // Apply pe2shc to bins/x64/scepter_server.x64.dll
+    let status = Command::new("pe2shc")
+        .args(&["scepter_server.windows.x64.dll", "scepter_server.shc.windows.x64.dll"])
+        .current_dir("./bins/x64/")
+        .status()
+        .expect("Failed to build. Is pe2shc installed and added to your system path? If you're trying to use a different reflective loader, ignore this message.");
+    if !status.success() {
+        exit(1);
+    }
+
     println!("Done");
 }
