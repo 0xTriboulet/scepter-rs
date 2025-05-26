@@ -236,7 +236,7 @@ alias ssh-exec {
     $args = bof_pack($bid, "z", $data);
 
     # Build bof path; This needs rework if you want to support x86 for whatever reason
-    $bof_path = getFileProper(script_resource("."), "bof-vs", "x64", "Release", "bof.x64.o");
+    $bof_path = getFileProper(script_resource("."), "out", "x64", $bof_write_pipe_name);
 
     # read in the right BOF file
     $handle = openf($bof_path);
@@ -254,21 +254,21 @@ alias ssh-exec {
 # Register the command
 # --------------------
 beacon_command_group(
-	"ssh_server_interface",
+	"scepter-rs",
 	"User-Defined SSH Interface",
-	"User-implemented reflective DLL that provdes SSH Server functionality so that Agents can connect to the server.\nUsers can then interact with those agents via custom commands."
+	"User-implemented reflective DLL that provdes SSH Server functionality so that Agents can connect to the server.\nUsers can then interact with those agents via custom commands in the Beacon console."
 );
 
 beacon_command_register(
-	"ssh-init",
+	"scepter-init",
 	"(64-bit only) Initializes RDLL and BOF to start SSH Server on the target host.",
-	"ssh-init <target ip> <target-port> <username> <password> <optional: pid>\nex: ssh-init 192.0.0.1 2222 my_username my_password 12345",
-	"ssh_server_interface"
+	"scepter-init <target ip> <target-port> <username> <password> <optional: pid>\nex: scepter-init 192.0.0.1 2222 my_username my_password 12345",
+	"scepter-rs"
 );
 
 beacon_command_register(
-	"ssh-exec",
+	"scepter-exec",
 	"(64-bit only) Uses a bof to write a command to a pipe that is read by a user implemented reflective DLL and sent to the ssh target.",
-	"ssh-exec <user command>\nex:ssh-exec whoami",
-	"ssh_server_interface"
+	"scepter-exec <user command>\nex:scepter-exec whoami",
+	"scepter-rs"
 );
