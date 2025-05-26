@@ -24,13 +24,16 @@ $ssh_password_stomp_me = "_________PLACEHOLDER_PASSWORD_STRING_PLS_DO_NOT_CHANGE
 
 $pipe_wait = 30000; # Custom timeout
 
-
 #
 # File names, you shouldn't have to change these unless you changed something in bin/
 #
 $server_dll_name = "scepter_server.shc.windows.x64.dll"; # default name
 $bof_write_pipe_name  = "bof_write_pipe.x64.o";
 $agent_base_name = "scepter-agent";
+
+# Declare the list of strings
+$os_list = @("linux", "windows", "apple")
+$arch_list = @("aarch64", "x64")
 
 # $1 - bytes where we are going to do the stoming
 # $2 - string we want to stomp
@@ -103,7 +106,7 @@ alias ssh-init {
     # All binaries are stored in bins/
 
     # Build rdll path; This needs rework if you want to support x86 for whatever reason
-    # The server must have the interface IP, POST, username, password, input pipe and outputpipe names stomped in 
+    # The server must have the interface IP, PORT, username, password, input pipe and outputpipe names stomped in 
     $rdll_path = getFileProper(script_resource("."), "bins", "x64", $server_dll_name);
 
     # Build bof path; This needs rework if you want to support x86 for whatever reason
@@ -137,6 +140,9 @@ alias ssh-init {
     # RDLL STOMP OUTPUT PIPE, this is the pipe we use to send commands that are forwarded to the rdll to the target   #
     # Now use $pipe_input_stomp_me_name in strrep
     $rdll = stomp-str($rdll, $pipe_output_stomp_me_name, "30", $pipe_output_name_final);
+
+    # RDLL STOMP Port that will host the SSH Service
+    $rdll = stomp-str($rdll, $ssh_port_stomp_me, "5", $target_port);
 
     # Open output handle
     $handle = openf(">" . $rdll_path);

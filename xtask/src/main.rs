@@ -92,6 +92,34 @@ fn main() {
         exit(1);
     }
 
+    // Built Windows aarch64 agent: cargo build --target aarch64-pc-windows-msvc -p scepter-agent --release
+    let status = Command::new("cargo")
+        .args(&["build", "--release", "--manifest-path", "./Cargo.toml", "--target", "aarch64-pc-windows-msvc"])
+        .current_dir("./scepter-agent")
+        .status()
+        .expect("Failed to build");
+    if !status.success() {
+        exit(1);
+    }
+
+    let status = Command::new("cp")
+        .args(&["target/aarch64-pc-windows-msvc/release/scepter-agent.exe", "./bins/aarch64/scepter_agent.windows.aarch64.exe"])
+        .current_dir(".")
+        .status()
+        .expect("Failed to copy");
+    if !status.success() {
+        exit(1);
+    }
+
+    let status = Command::new("cp")
+        .args(&["target/aarch64-pc-windows-msvc/release/scepter_agent.dll", "./bins/aarch64/scepter_agent.windows.aarch64.dll"])
+        .current_dir(".")
+        .status()
+        .expect("Failed to copy");
+    if !status.success() {
+        exit(1);
+    }
+
     // Compile BOF
     let status = Command::new("cc")
         .args(&["bof.c", "-c", "-o", "../bins/x64/bof_write_pipe.x64.o"])
