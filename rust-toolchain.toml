@@ -1,0 +1,4 @@
+[toolchain]
+channel = "nightly"
+targets = ["x86_64-pc-windows-gnu"]
+profile = "complete"

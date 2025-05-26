@@ -18,3 +18,4 @@ windows-sys = {version = "0.52.0", features = ["default"]}
 russh = "0.52.1"
 rand_core = "0.6.4"
 tokio = "1.45.0"
+debug_print = "1.0.0"
