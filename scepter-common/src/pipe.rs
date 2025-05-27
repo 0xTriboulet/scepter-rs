@@ -68,7 +68,7 @@ pub fn read_input(h_input_pipe: HANDLE) -> Option<String> {
 
 pub fn initialize_input_pipe() -> Option<HANDLE> {
     let pipe_name = String::from_utf8_lossy(&*INPUT_PIPE_NAME);
-
+    debug_println!("Pipe name: {}", pipe_name);
     let h_pipe = unsafe {
         CreateNamedPipeA(
             pipe_name.as_ptr() as *const u8,
@@ -104,7 +104,7 @@ pub fn initialize_input_pipe() -> Option<HANDLE> {
 
 pub fn initialize_output_pipe() -> Option<HANDLE> {
     let pipe_name = String::from_utf8_lossy(&*OUTPUT_PIPE_NAME);
-
+    debug_println!("Pipe name: {}", pipe_name);
     let h_pipe = unsafe {
         CreateNamedPipeA(
             pipe_name.as_ptr() as *const u8,

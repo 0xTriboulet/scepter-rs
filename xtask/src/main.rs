@@ -5,6 +5,7 @@ fn main() {
     println!("[INFO] The current directory is {}", path.display());
 
     // Build scepter-server -- 64-bit only because I don't care about 32-bit, sorry
+    println!("[XTASK] Building scepter-server...");
     let status = Command::new("cargo")
         .args(&["build", "--release", "--manifest-path", "./Cargo.toml", "--target", "x86_64-pc-windows-gnu"])
         .current_dir("./scepter-server")
@@ -25,6 +26,7 @@ fn main() {
     }
 
     // Build Win64 scepter-agent
+    println!("[XTASK] Building scepter-agent...");
     let status = Command::new("cargo")
         .args(&["build", "--release", "--manifest-path", "./Cargo.toml", "--target", "x86_64-pc-windows-gnu"])
         .current_dir("./scepter-agent")
@@ -121,6 +123,7 @@ fn main() {
     }
 
     // Compile BOF
+    println!("[XTASK] Building BOF...");
     let status = Command::new("cc")
         .args(&["bof.c", "-c", "-o", "../bins/x64/bof_write_pipe.x64.o"])
         .current_dir("./bof-write-pipe")
@@ -131,6 +134,7 @@ fn main() {
     }
 
     // Apply pe2shc to bins/x64/scepter_server.x64.dll
+    println!("[XTASK] Applying pe2shc...");
     let status = Command::new("pe2shc")
         .args(&["scepter_server.windows.x64.dll", "scepter_server.shc.windows.x64.dll"])
         .current_dir("./bins/x64/")
@@ -140,5 +144,5 @@ fn main() {
         exit(1);
     }
 
-    println!("Done");
+    println!("[XTASK] Done");
 }

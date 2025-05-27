@@ -2,11 +2,11 @@ pub mod pipe;
 
 /// Placeholder strings get stomped in by CNA in release mode
 #[cfg(not(debug_assertions))]
-pub static USERNAME: &[u8; 64] =
-    b"_________PLACEHOLDER_USERNAME_STRING_PLS_DO_NOT_CHANGE__________";
+pub static USERNAME: &[u8; 65] =
+    b"_________PLACEHOLDER_USERNAME_STRING_PLS_DO_NOT_CHANGE__________\0";
 #[cfg(not(debug_assertions))]
-pub static PASSWORD: &[u8; 64] =
-    b"_________PLACEHOLDER_PASSWORD_STRING_PLS_DO_NOT_CHANGE__________";
+pub static PASSWORD: &[u8; 65] =
+    b"_________PLACEHOLDER_PASSWORD_STRING_PLS_DO_NOT_CHANGE__________\0";
 
 #[cfg(not(debug_assertions))]
 pub static SSH_INTERFACE_IPV4_ADDRESS: &[u8; 20] = b"999.999.999.999\0\0\0\0\0";

