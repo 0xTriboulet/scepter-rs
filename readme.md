@@ -87,6 +87,7 @@ For proof-of-concept functionality, `scepter-rs` applies `pe2shc`'s reflective l
 ![img.png](img.png)
 
 To facilitate using additional/alternative reflective loaders, `scepter_server.windows.x64.dll` exports `dll_start` as an alternate entry point for loaders that allow for the specification of entry points (for example Donut's `--function` option).
+
 ![img_1.png](img_1.png)
 
 This capability is theoretical and untested. Feedback is welcome.
