@@ -1,8 +1,8 @@
 # scepter-rs
 
-A Rust-based command and control (C2) relationship designed to maximize compatability with non-standard devices. `scepter-rs` provides a minimal command and control interface that can be leveraged from [your favorite C2 framework](https://www.cobaltstrike.com/).
+A Rust-based server-agent Command-and-Control designed to maximize compatability with non-standard devices. `scepter-rs` provides a minimal command and control interface that can be leveraged from [your favorite C2 framework](https://www.cobaltstrike.com/).
 
-Similar in design to [rssh-rs](https://github.com/0xTriboulet/rssh-rs/tree/master), this project enables external capability to be deployed from a Beacon console, effectively providing (*very*) primitive support for 3rd-party SSH pivot Agents from an existing Beacon session.
+Based on [rdll-rs](https://github.com/0xTriboulet/rdll-rs) and similar in design to [rssh-rs](https://github.com/0xTriboulet/rssh-rs/tree/master), this project enables external capability to be deployed from a Beacon console, effectively providing (*very*) primitive support for 3rd-party SSH pivot agents from an existing Beacon session. Unlike `rssh-rs`, `scepter-rs` inverts the communication relationship and stands up an SSH server on the Beacon-side of communications, increasing the potential for SSH client-side customization.
 
 ![img_4.png](img_4.png)
 
@@ -18,7 +18,6 @@ Similar in design to [rssh-rs](https://github.com/0xTriboulet/rssh-rs/tree/maste
 
 - Cross-platform support for various operating systems
 - Encrypted communications between server and agents
-- Modular design allowing for easy extension
 - Integration with Cobalt Strike via Aggressor scripts (.cna)
 - Customizable command execution and data exfiltration
 
@@ -91,6 +90,12 @@ To facilitate using additional/alternative reflective loaders, `scepter_server.w
 ![img_1.png](img_1.png)
 
 This capability is theoretical and untested. Feedback is welcome.
+
+## ToDo
+- BOF support for Windows/Linux
+- Refactor the code a bit (it's a mess)
+- Unit tests :D
+- More pre-built Agents???
 
 ## License
 MIT or Apache 2.0.
