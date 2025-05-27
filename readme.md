@@ -2,7 +2,7 @@
 
 A Rust-based command and control (C2) relationship designed to maximize compatability with non-standard devices. `scepter-rs` provides a minimal command and control interface that can be leveraged from [your favorite C2 framework](https://www.cobaltstrike.com/).
 
-Similar in design to [rssh-rs](https://github.com/0xTriboulet/rssh-rs/tree/master), this project enables external capability to be deployed from a Beacon console, effectively providing primitive support for 3rd-party pivot Agents from an existing Beacon session.
+Similar in design to [rssh-rs](https://github.com/0xTriboulet/rssh-rs/tree/master), this project enables external capability to be deployed from a Beacon console, effectively providing (*very*) primitive support for 3rd-party SSH pivot Agents from an existing Beacon session.
 
 ![img_4.png](img_4.png)
 
@@ -41,16 +41,7 @@ The project uses a workspace structure to manage multiple related crates. The `x
    cargo run --bin xtask --release
    ```
 **Note: Apple aarch64 and x64 were manually built due to shortfalls in cargo-zigbuild's compatibility on Windows environments. The command above will NOT rebuild the Apple binaries.**
-3. The compiled binaries will be available in the `bins/` directory.
-4. Copy a binary from `bins/` to the target system via some other means.
-5. Run the binary on the target system.
-6. Run commands via `ssh-exec`
-   ```bash
-   beacon> help scepter-exec
-   scepter-exec <user command>
-   ex:scepter-exec whoami   
-   ```
-   ![img_3.png](img_3.png)
+
 
 ### Usage
 
@@ -59,10 +50,10 @@ The project uses a workspace structure to manage multiple related crates. The `x
 Agents can be compiled for a variety of platforms. `scepter-rs.cna` stomps in connection information provided in the `.cna` as well as from the Beacon console as necessary. The `scepter_server` is initialized via the `scepter-init` command in a Beacon console.
 
 This project contains (untested/experimental) pre-built Agent binaries in the `bins/` folder, supporting:
-- Windows x64
+- Windows x64 (tested)
 - Windows aarch64
 - Linux x64
-- Linux aarch64
+- Linux aarch64 (tested)
 - Apple x64
 - Apple aarch64
 
@@ -76,15 +67,24 @@ The included `scepter-rs.cna` script provides integration with Cobalt Strike:
 
 1. Load the script in your Cobalt Strike client
 2. Initialize the scepter-server with the `scepter-init` command.
-```
-beacon> help scepter-init
-scepter-init <target ip> <target-port> <username> <password> <optional: pid>
-ex: scepter-init 192.0.0.1 2222 my_username my_password 12345
-```
-3. Your operational binaries are provided in the `out/` directory.
+   ```
+   beacon> help scepter-init
+   scepter-init <target ip> <target-port> <username> <password> <optional: pid>
+   ex: scepter-init 192.0.0.1 2222 my_username my_password 12345
+   ```
+3. The compiled binaries will be available in the `bins/` directory.
+4. Copy a binary from `bins/` to the target system via some other means.
+5. Run the binary on the target system.
+6. Run commands via `ssh-exec`
+   ```bash
+   beacon> help scepter-exec
+   scepter-exec <user command>
+   ex:scepter-exec whoami   
+   ```
+   ![img_3.png](img_3.png)
 #### Applying Other Reflective Loaders
 
-For proof-of-concept functionality, `scepter-rs` applies `pe2shc`'s reflective loader to `scepter_server.windows.x64.dll`. However, one of the really cool capabilities of `pe2shc` is that the output PE retains all functionality of the original. This means that you can apply your own "obfuscation"-enabled reflective loader on-top without any negative effects at run time.
+For proof-of-concept functionality, `scepter-rs` applies `pe2shc`'s reflective loader to `scepter_server.windows.x64.dll` -> `scepter_server.shc.windows.x64.dll`. However, one of the really cool capabilities of `pe2shc` is that the output PE retains all functionality of the original. This means that you can apply your own "obfuscation"-enabled reflective loader on-top without any negative effects at run time.
 ![img.png](img.png)
 
 To facilitate using additional/alternative reflective loaders, `scepter_server.windows.x64.dll` exports `dll_start` as an alternate entry point for loaders that allow for the specification of entry points (for example Donut's `--function` option).
