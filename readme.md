@@ -37,6 +37,9 @@ The project uses a workspace structure to manage multiple related crates. The `x
    ```bash
    git clone https://github.com/yourusername/scepter-rs.git
    cd scepter-rs
+   ```
+2. Run the `xtask` 
+   ```bash
    cargo run --bin xtask --release
    ```
 **Note: Apple aarch64 and x64 were manually built due to shortfalls in cargo-zigbuild's compatibility on Windows environments. The command above will NOT rebuild the Apple binaries.**
