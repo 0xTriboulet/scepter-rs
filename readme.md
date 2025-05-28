@@ -71,8 +71,8 @@ The included `scepter-rs.cna` script provides integration with Cobalt Strike:
    scepter-init <target ip> <target-port> <username> <password> <optional: pid>
    ex: scepter-init 192.0.0.1 2222 my_username my_password 12345
    ```
-3. The compiled binaries will be available in the `bins/` directory.
-4. Copy a binary from `bins/` to the target system via some other means.
+3. The compiled binaries will be available in the `out/` directory.
+4. Copy a binary from `out/` to the target system via some other means.
 5. Run the binary on the target system.
 6. Run commands via `ssh-exec`
    ```bash
