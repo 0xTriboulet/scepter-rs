@@ -14,7 +14,7 @@ path = "src/main.rs"
 
 [dependencies]
 scepter-common = { path = "../scepter-common" }
-windows-sys = {version = "0.59.0", features = ["default"]}
+windows-sys = {version = "0.59.0", features = ["default", "Win32_System_Threading"]}
 russh = "0.52.1"
 rand_core = "0.6.4"
 tokio = "1.45.0"
