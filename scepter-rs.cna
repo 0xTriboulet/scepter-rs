@@ -296,7 +296,7 @@ alias scepter-init {
     }
 
     blog($beacon_id, "[SCEPTER] Starting SSH server on " . $interface_ip_final . ":" . $target_port . " in process " . $pid . ".");
-    blog($beacon_id, "[SCEPTER] Starting SSH clients ( " . getFileProper(script_resource(".")) . "out ) will try to connect to " . $target_ip . ":" . $target_port . ".");
+    blog($beacon_id, "[SCEPTER] Starting SSH clients ( " . getFileProper(script_resource("."), "out") . " ) will try to connect to " . $target_ip . ":" . $target_port . ".");
 
     # Add random number to the pipe names
     $pipe_input_name_final = append_random($pipe_input_name_final);
