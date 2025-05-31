@@ -12,6 +12,13 @@ path = "src/lib.rs"
 name = "scepter-server"
 path = "src/main.rs"
 
+[profile.release]
+strip = "symbols"
+panic = "abort"
+opt-level = "z"
+codegen-units = 1
+lto = true
+
 [dependencies]
 scepter-common = { path = "../scepter-common" }
 windows-sys = {version = "0.59.0", features = ["default", "Win32_System_Threading"]}

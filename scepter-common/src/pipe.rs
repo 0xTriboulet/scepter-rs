@@ -3,7 +3,9 @@ use debug_print::debug_println;
 use std::ffi::CString;
 use std::ptr;
 use std::ptr::null_mut;
-use windows_sys::Win32::Foundation::{CloseHandle, ERROR_PIPE_CONNECTED, GetLastError, INVALID_HANDLE_VALUE, HANDLE};
+use windows_sys::Win32::Foundation::{
+    CloseHandle, ERROR_PIPE_CONNECTED, GetLastError, HANDLE, INVALID_HANDLE_VALUE,
+};
 use windows_sys::Win32::Storage::FileSystem::{
     FlushFileBuffers, PIPE_ACCESS_DUPLEX, PIPE_ACCESS_INBOUND, ReadFile, WriteFile,
 };
