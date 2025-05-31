@@ -12,12 +12,16 @@ path = "src/lib.rs"
 name = "scepter-agent"
 path = "src/main.rs"
 
+[profile.release]
+strip = "symbols"
+panic = "abort"
+opt-level = "z"
+codegen-units = 1
+lto = true
+
 [dependencies]
 scepter-common = { path = "../scepter-common" }
 russh = "0.52.1"
-rand_core = "0.6.4"
 tokio = "1.45.0"
-env_logger = "0.11.8"
-log = "0.4.27"
 windows-sys = "0.59.0"
 debug_print = "1.0.0"

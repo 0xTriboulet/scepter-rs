@@ -69,7 +69,7 @@ The included `scepter-rs.cna` script provides integration with Cobalt Strike:
 
 1. Load the script in your Cobalt Strike client
 2. Initialize the scepter-server with the `scepter-init` command.
-   ```
+   ```bash
    beacon> help scepter-init
    scepter-init <target ip> <target-port> <username> <password> <optional: pid>
    ex: scepter-init 192.0.0.1 2222 my_username my_password 12345
@@ -84,6 +84,16 @@ The included `scepter-rs.cna` script provides integration with Cobalt Strike:
    ex:scepter-exec whoami   
    ```
    ![img_3.png](img_3.png)
+#### Scepter Commands
+`scepter-rs` Provide various commands from the `scepter-rs.cna` that are accessible from the Beacon console for ease of use.
+```bash
+scepter-exec               (64-bit only) Uses a bof to write a command to a pipe that is read by a user implemented reflective DLL and sent to the ssh target.
+scepter-exit               (64-bit only) Uses a bof to write the exit command to a pipe that is read by a user implemented reflective DLL. SSH Server exits.
+scepter-generate-agents    (64-bit only) Builds Agent binaries with configuration specified in .cna without starting the SSH Scepter Server.
+scepter-init               (64-bit only) Initializes RDLL and BOF to start SSH Scepter Server on the target host, and builds Agents for use.
+ ```
+
+
 #### Applying Other Reflective Loaders
 
 For proof-of-concept functionality, `scepter-rs` applies `pe2shc`'s reflective loader to `scepter_server.windows.x64.dll` -> `scepter_server.shc.windows.x64.dll`. However, one of the really cool capabilities of `pe2shc` is that the output PE retains all functionality of the original. This means that you can apply your own "obfuscation"-enabled reflective loader on-top without any negative effects at run time.

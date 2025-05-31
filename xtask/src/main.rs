@@ -7,7 +7,14 @@ fn main() {
     // Build scepter-server -- 64-bit only because I don't care about 32-bit, sorry
     println!("[XTASK] Building scepter-server...");
     let status = Command::new("cargo")
-        .args(&["build", "--release", "--manifest-path", "./Cargo.toml", "--target", "x86_64-pc-windows-gnu"])
+        .args(&[
+            "build",
+            "--release",
+            "--manifest-path",
+            "./Cargo.toml",
+            "--target",
+            "x86_64-pc-windows-gnu",
+        ])
         .current_dir("./scepter-server")
         .status()
         .expect("Failed to build");
@@ -17,7 +24,10 @@ fn main() {
 
     // Copy target/x86_64-pc-windows-gnu/release/scepter_server.dll to bins/x64/scepter_server.x64.dll
     let status = Command::new("cp")
-        .args(&["target/x86_64-pc-windows-gnu/release/scepter_server.dll", "./bins/x64/scepter_server.windows.x64.dll"])
+        .args(&[
+            "target/x86_64-pc-windows-gnu/release/scepter_server.dll",
+            "./bins/x64/scepter_server.windows.x64.dll",
+        ])
         .current_dir(".")
         .status()
         .expect("Failed to copy");
@@ -28,7 +38,14 @@ fn main() {
     // Build Win64 scepter-agent
     println!("[XTASK] Building scepter-agent...");
     let status = Command::new("cargo")
-        .args(&["build", "--release", "--manifest-path", "./Cargo.toml", "--target", "x86_64-pc-windows-gnu"])
+        .args(&[
+            "build",
+            "--release",
+            "--manifest-path",
+            "./Cargo.toml",
+            "--target",
+            "x86_64-pc-windows-gnu",
+        ])
         .current_dir("./scepter-agent")
         .status()
         .expect("Failed to build");
@@ -38,7 +55,10 @@ fn main() {
 
     // Copy target/x86_64-pc-windows-gnu/release/scepter_agent.exe/dll to bins/x64/scepter_agent.x64.exe/dll
     let status = Command::new("cp")
-        .args(&["target/x86_64-pc-windows-gnu/release/scepter_agent.dll", "./bins/x64/scepter_agent.windows.x64.dll"])
+        .args(&[
+            "target/x86_64-pc-windows-gnu/release/scepter_agent.dll",
+            "./bins/x64/scepter_agent.windows.x64.dll",
+        ])
         .current_dir(".")
         .status()
         .expect("Failed to copy");
@@ -47,7 +67,10 @@ fn main() {
     }
 
     let status = Command::new("cp")
-        .args(&["target/x86_64-pc-windows-gnu/release/scepter-agent.exe", "./bins/x64/scepter_agent.windows.x64.exe"])
+        .args(&[
+            "target/x86_64-pc-windows-gnu/release/scepter-agent.exe",
+            "./bins/x64/scepter_agent.windows.x64.exe",
+        ])
         .current_dir(".")
         .status()
         .expect("Failed to copy");
@@ -57,7 +80,14 @@ fn main() {
 
     // Build Linux 64 scepter-agent
     let status = Command::new("cargo")
-        .args(&["build", "--release", "--manifest-path", "./Cargo.toml", "--target", "x86_64-unknown-linux-musl"])
+        .args(&[
+            "build",
+            "--release",
+            "--manifest-path",
+            "./Cargo.toml",
+            "--target",
+            "x86_64-unknown-linux-musl",
+        ])
         .current_dir("./scepter-agent")
         .status()
         .expect("Failed to build");
@@ -67,7 +97,10 @@ fn main() {
 
     // Copy target/x86_64-unknown-linux-musl/release/scepter_agent to bins/x64/scepter_agent.lin.x64.bin
     let status = Command::new("cp")
-        .args(&["target/x86_64-unknown-linux-musl/release/scepter-agent", "./bins/x64/scepter_agent.linux.x64.bin"])
+        .args(&[
+            "target/x86_64-unknown-linux-musl/release/scepter-agent",
+            "./bins/x64/scepter_agent.linux.x64.bin",
+        ])
         .current_dir(".")
         .status()
         .expect("Failed to copy");
@@ -77,7 +110,14 @@ fn main() {
 
     // Built Linux aarch64 agent: cargo zigbuild --target aarch64-unknown-linux-gnu -p scepter-agent
     let status = Command::new("cargo")
-        .args(&["zigbuild", "--release", "--manifest-path", "./Cargo.toml", "--target", "aarch64-unknown-linux-gnu"])
+        .args(&[
+            "zigbuild",
+            "--release",
+            "--manifest-path",
+            "./Cargo.toml",
+            "--target",
+            "aarch64-unknown-linux-gnu",
+        ])
         .current_dir("./scepter-agent")
         .status()
         .expect("Failed to build");
@@ -86,7 +126,10 @@ fn main() {
     }
 
     let status = Command::new("cp")
-        .args(&["target/aarch64-unknown-linux-gnu/release/scepter-agent", "./bins/aarch64/scepter_agent.linux.aarch64.bin"])
+        .args(&[
+            "target/aarch64-unknown-linux-gnu/release/scepter-agent",
+            "./bins/aarch64/scepter_agent.linux.aarch64.bin",
+        ])
         .current_dir(".")
         .status()
         .expect("Failed to copy");
@@ -96,7 +139,14 @@ fn main() {
 
     // Built Windows aarch64 agent: cargo build --target aarch64-pc-windows-msvc -p scepter-agent --release
     let status = Command::new("cargo")
-        .args(&["build", "--release", "--manifest-path", "./Cargo.toml", "--target", "aarch64-pc-windows-msvc"])
+        .args(&[
+            "build",
+            "--release",
+            "--manifest-path",
+            "./Cargo.toml",
+            "--target",
+            "aarch64-pc-windows-msvc",
+        ])
         .current_dir("./scepter-agent")
         .status()
         .expect("Failed to build");
@@ -105,7 +155,10 @@ fn main() {
     }
 
     let status = Command::new("cp")
-        .args(&["target/aarch64-pc-windows-msvc/release/scepter-agent.exe", "./bins/aarch64/scepter_agent.windows.aarch64.exe"])
+        .args(&[
+            "target/aarch64-pc-windows-msvc/release/scepter-agent.exe",
+            "./bins/aarch64/scepter_agent.windows.aarch64.exe",
+        ])
         .current_dir(".")
         .status()
         .expect("Failed to copy");
@@ -114,7 +167,10 @@ fn main() {
     }
 
     let status = Command::new("cp")
-        .args(&["target/aarch64-pc-windows-msvc/release/scepter_agent.dll", "./bins/aarch64/scepter_agent.windows.aarch64.dll"])
+        .args(&[
+            "target/aarch64-pc-windows-msvc/release/scepter_agent.dll",
+            "./bins/aarch64/scepter_agent.windows.aarch64.dll",
+        ])
         .current_dir(".")
         .status()
         .expect("Failed to copy");

