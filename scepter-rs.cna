@@ -91,6 +91,11 @@ sub stomp-str {
     return $output_string;
 }
 
+# $1 - beacon id
+# $2 - target IP address
+# $3 - target port number
+# $4 - username
+# $5 - password
 alias scepter-generate-agents {
     local('$barch $beacon_id $pid $agent $agent_path $agent_path_out $rdll_path $rdll_path_out $target_ip $target_port $target_username $target_password $rdll $handle $actual_pipe_name $desired_length $null_padding $padding_needed $padded_pipe_name $bof_path $bof_path_out $bof_data');
     $beacon_id = $1;
@@ -98,7 +103,6 @@ alias scepter-generate-agents {
     $target_port = $3; # ssh server port
     $target_username = $4;
     $target_password = $5;
-    $pid = $6; # optional PID
 
     if($target_ip is $null || $target_password is $null || $target_password is $null){
         berror($1, "Invalid arguments");
@@ -112,15 +116,6 @@ alias scepter-generate-agents {
         berror($1, "This script only supports x64 processes");
         return;
     }
-
-    # If pid was not passed in, local injection
-    if ($pid == $null){
-        $pid = beacon_info($beacon_id, "pid");
-    }
-
-    # Add random number to the pipe names
-    $pipe_input_name_final = append_random($pipe_input_name_final);
-    $pipe_output_name_final = append_random($pipe_output_name_final);
 
     # All binaries are stored in bins/
 
@@ -247,7 +242,7 @@ alias scepter-generate-agents {
     # Close handle
     closef($handle);
 
-    println("[SCEPTER] Artifacts generated into " . getFileProper(script_resource("."))  . " directory.");
+    println("[SCEPTER] Artifacts generated into " . getFileProper(script_resource(".")) . "out" . " directory.");
 }
 
 # $1 - beacon id
@@ -538,7 +533,7 @@ alias scepter-exit {
 # --------------------
 beacon_command_group(
 	"scepter-rs",
-	"User-Defined SSH Interface",
+	"User-Defined SSH C2 Interface",
 	"User-implemented reflective DLL that provdes SSH Server functionality so that Agents can connect to the server.\nUsers can then interact with those agents via custom commands in the Beacon console."
 );
 
@@ -566,6 +561,6 @@ beacon_command_register(
 beacon_command_register(
 	"scepter-generate-agents",
 	"(64-bit only) Builds Agent binaries with configuration specified in .cna without starting the SSH Scepter Server.",
-	"scepter-generate-agents <target ip> <target-port> <username> <password> <optional: pid>\nex: scepter-generate-agents 192.0.0.1 2222 my_username my_password 12345",
+	"scepter-generate-agents <target ip> <target-port> <username> <password>\nex: scepter-generate-agents 192.0.0.1 2222 my_username my_password",
 	"scepter-rs"
 );
