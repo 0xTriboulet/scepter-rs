@@ -1,7 +1,8 @@
 import beacon.CommandBuilder;
 
-global('$ssh_inited $server_dll_name $reading_inited $pipe_wait $arch_list $file_ext $pipe_output_name_final $agent_base_name $pipe_input_name_final $pipe_output_stomp_me_name $pipe_input_stomp_me_name $ssh_ip_stomp_me $ssh_ip_connect_stomp_me $ssh_port_stomp_me $ssh_username_stomp_me $ssh_password_stomp_me');
+global('$ssh_inited $server_dll_name $reading_inited $artifacts_inited $pipe_wait $arch_list $file_ext $pipe_output_name_final $agent_base_name $pipe_input_name_final $pipe_output_stomp_me_name $pipe_input_stomp_me_name $ssh_ip_stomp_me $ssh_ip_connect_stomp_me $ssh_port_stomp_me $ssh_username_stomp_me $ssh_password_stomp_me');
 $ssh_inited = -1;
+$artifacts_inited = -1;
 $reading_inited = -1;
 
 println("[SCEPTER] You are now holding the Scepter.")
@@ -105,7 +106,7 @@ alias scepter-generate-agents {
     $target_password = $5;
 
     if($target_ip is $null || $target_password is $null || $target_password is $null){
-        berror($1, "Invalid arguments");
+        berror($1, "[SCEPTER] Invalid arguments");
         return;
     }
 
@@ -113,9 +114,18 @@ alias scepter-generate-agents {
     $barch = beacon_info($beacon_id, "barch");
 
     if ($barch != "x64") {
-        berror($1, "This script only supports x64 processes");
+        berror($1, "[SCEPTER] This script only supports x64 processes");
         return;
     }
+
+    if($artifacts_inited > 0){
+        berror($beacon_id , "[SCEPTER] Artifacts already initialized.");
+        return; 
+    }
+
+    # Add random number to the pipe names
+    $pipe_input_name_final = append_random($pipe_input_name_final);
+    $pipe_output_name_final = append_random($pipe_output_name_final);
 
     # All binaries are stored in bins/
 
@@ -242,6 +252,8 @@ alias scepter-generate-agents {
     # Close handle
     closef($handle);
 
+    $artifacts_inited = 1;
+
     println("[SCEPTER] Artifacts generated into " . getFileProper(script_resource(".")) . "out" . " directory.");
 }
 
@@ -261,7 +273,7 @@ alias scepter-init {
     $pid = $6; # optional PID
 
     if($target_ip is $null || $target_password is $null || $target_password is $null){
-        berror($1, "Invalid arguments");
+        berror($1, "[SCEPTER] Invalid arguments");
         return;
     }
 
@@ -274,7 +286,7 @@ alias scepter-init {
     $barch = beacon_info($beacon_id, "barch");
 
     if ($barch != "x64") {
-        berror($1, "This script only supports x64 processes");
+        berror($1, "[SCEPTER] This script only supports x64 processes");
         return;
     }
 
