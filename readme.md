@@ -35,7 +35,7 @@ The project uses a workspace structure to manage multiple related crates. The `x
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/yourusername/scepter-rs.git
+   git clone https://github.com/0xtriboulet/scepter-rs.git
    cd scepter-rs
    ```
 2. Run the `xtask` 

@@ -76,7 +76,7 @@ pub fn initialize_input_pipe() -> Option<HANDLE> {
             pipe_name.as_ptr() as *const u8,
             PIPE_ACCESS_INBOUND,
             PIPE_TYPE_MESSAGE | PIPE_READMODE_MESSAGE,
-            1,
+            1, // TODO maybe re-evaluate this
             MAX_PIPE_BUFFER_SIZE as u32,
             MAX_PIPE_BUFFER_SIZE as u32,
             0,
@@ -115,7 +115,7 @@ pub fn initialize_output_pipe() -> Option<HANDLE> {
             1,
             MAX_PIPE_BUFFER_SIZE as u32,
             MAX_PIPE_BUFFER_SIZE as u32,
-            0,
+            0, // WAIT
             std::ptr::null_mut(),
         )
     };

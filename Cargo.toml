@@ -8,8 +8,18 @@ members = [
 resolver = "3"
 
 [profile.release]
+debug = false
 strip = "symbols"
-panic = "abort"
 opt-level = "z"
+panic = "abort"
+incremental = false
 codegen-units = 1
-lto = true
+overflow-checks = false
+debug-assertions = false
+rpath = false
+
+# Additional size reduction for all dependencies
+[profile.release.package."*"]
+opt-level = "z"
+strip = "symbols"
+codegen-units = 1

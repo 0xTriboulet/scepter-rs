@@ -433,6 +433,17 @@ alias scepter-init {
     $ssh_inited = 1;
 
     println("[SCEPTER] SSH server initiated.");
+
+    if($reading_inited < 0){
+        # give the bof a couple of seconds to write the data to the pipe
+
+        bpause($beacon_id, 5 * 1000);
+
+        # read from the output pipe
+        scepter-read($beacon_id, $null);
+
+        $reading_inited = 1;
+    }
 }
 
 # $1 - beacon id
@@ -500,10 +511,10 @@ alias scepter-exec {
     # execute it.
     beacon_inline_execute($beacon_id, $bof_data, "go", $args);
 
-        if($reading_inited < 0){
+    if($reading_inited < 0){
         # give the bof a couple of seconds to write the data to the pipe
 
-        bpause($beacon_id, 5 * 1000);
+        # bpause($beacon_id, 1 * 1000);
 
         # read from the output pipe
         scepter-read($beacon_id, $null);

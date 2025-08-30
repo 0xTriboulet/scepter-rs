@@ -80,5 +80,5 @@ WINBASEAPI DWORD WINAPI KERNEL32$GetLastError(VOID);
      // Send the data to the named pipe
      WriteToNamedPipe(data, dataLen);
 
-     BeaconPrintf(CALLBACK_OUTPUT, "Sent command: %s", data);
+     BeaconPrintf(CALLBACK_OUTPUT, "Sent: %s", data);
  }
