@@ -4,14 +4,16 @@ A Rust-based server-agent Command-and-Control designed to maximize compatability
 
 Based on [rdll-rs](https://github.com/0xTriboulet/rdll-rs) and similar in design to [rssh-rs](https://github.com/0xTriboulet/rssh-rs/tree/master), this project enables external capability to be deployed from a Beacon console, effectively providing (*very*) primitive support for 3rd-party SSH pivot agents from an existing Beacon session. Unlike `rssh-rs`, `scepter-rs` inverts the communication relationship and stands up an SSH server on the Beacon-side of the network, increasing client-side customization.
 
-![img_4.png](img_4.png)
+![img_5.png](img_5.png)
+
+`Scepter-rs` supports multiple client connections and uses a broadcast model of communications to dispatch commands.
 
 ## Project Components
 
 - **scepter-server**: The command server that manages connections and facilitates communication with agents
 - **scepter-agent**: The client-side agent that executes commands on target systems
 - **scepter-common**: Shared code and utilities used by both server and agent components
-- **bof-write-pipe**: Utility for writing to communication pipes
+- **bof-write-pipe**: BOF utility for writing to communication pipes
 - **xtask**: Custom build scripts and development tools
 
 ## Features
