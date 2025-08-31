@@ -24,6 +24,10 @@ pub fn read_input(h_input_pipe: HANDLE) -> Option<String> {
     let mut dyn_buffer = Box::new(vec![0u8; MAX_PIPE_BUFFER_SIZE as usize]);
     let mut bytes_read: u32 = 0;
 
+    if h_input_pipe == INVALID_HANDLE_VALUE || h_input_pipe == 0 as HANDLE {
+        return None;
+    }
+
     // Check if client is still connected
     let mut bytes_available: u32 = 0;
     let peek_result = unsafe {
@@ -133,6 +137,10 @@ pub fn initialize_output_pipe() -> Option<HANDLE> {
 pub fn write_output(h_output_pipe: HANDLE, data: &str) {
     let message = data.as_bytes();
     let mut bytes_written: u32 = 0;
+
+    if h_output_pipe == INVALID_HANDLE_VALUE || h_output_pipe == 0 as HANDLE {
+        return;
+    }
 
     let connected = unsafe { ConnectNamedPipe(h_output_pipe, std::ptr::null_mut()) };
     if connected == 0 {

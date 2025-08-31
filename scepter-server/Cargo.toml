@@ -19,6 +19,9 @@ opt-level = "z"
 codegen-units = 1
 lto = true
 
+[profile.dev]
+panic = "abort"
+
 [dependencies]
 scepter-common = { path = "../scepter-common" }
 windows-sys = {version = "0.59.0", features = ["default", "Win32_System_Threading"]}

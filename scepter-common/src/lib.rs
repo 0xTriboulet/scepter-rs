@@ -23,7 +23,7 @@ pub static PASSWORD: &[u8; 10] = b"password\0\0";
 #[cfg(debug_assertions)]
 pub static SSH_INTERFACE_IPV4_ADDRESS: &[u8; 20] = b"0.0.0.0\0\0\0\0\0\0\0\0\0\0\0\0\0";
 #[cfg(debug_assertions)]
-pub static SSH_CONNECT_IPV4_ADDRESS: &[u8; 20] = b"192.168.0.127\0\0\0\0\0\0\0";
+pub static SSH_CONNECT_IPV4_ADDRESS: &[u8; 20] = b"127.0.0.1\0\0\0\0\0\0\0\0\0\0\0";
 
 #[cfg(debug_assertions)]
-pub static SSH_PORT: &[u8; 20] = b"2222\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0";
+pub static SSH_PORT: &[u8; 20] = b"2224\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0";
