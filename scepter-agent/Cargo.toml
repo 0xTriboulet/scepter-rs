@@ -23,5 +23,5 @@ lto = true
 scepter-common = { path = "../scepter-common" }
 russh = "0.52.1"
 tokio = "1.45.0"
-windows-sys = "0.59.0"
+windows-sys = { version = "0.59.0", features = ["Win32_System_Threading"]}
 debug_print = "1.0.0"

@@ -24,5 +24,18 @@ rustflags = [
     "-Z", "unstable-options"
 ]
 
+[target.aarch64-pc-windows-msvc]
+rustflags = [
+    "-Z", "location-detail=none",
+    "-C", "target-feature=+crt-static",
+    "-C", "prefer-dynamic=false",
+    "-C", "embed-bitcode=false",
+    "-C", "debuginfo=0",
+    "-C", "symbol-mangling-version=v0",
+    "-Z", "share-generics=off",
+    "-Z", "threads=1",
+    "-Z", "unstable-options"
+]
+
 [target.x86_64-unknown-linux-musl]
 linker = "rust-lld"

