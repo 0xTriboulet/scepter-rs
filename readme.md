@@ -2,7 +2,7 @@
 
 A Rust-based server-agent Command-and-Control designed to maximize compatability with non-standard devices. `scepter-rs` provides a minimal command and control interface that can be leveraged from [your favorite C2 framework](https://www.cobaltstrike.com/).
 
-Based on [rdll-rs](https://github.com/0xTriboulet/rdll-rs) and similar in design to [rssh-rs](https://github.com/0xTriboulet/rssh-rs/tree/master), this project enables external capability to be deployed from a Beacon console, effectively providing (*very*) primitive support for 3rd-party SSH pivot agents from an existing Beacon session. Unlike `rssh-rs`, `scepter-rs` inverts the communication relationship and stands up an SSH server on the Beacon-side of communications, increasing the potential for SSH client-side customization.
+Based on [rdll-rs](https://github.com/0xTriboulet/rdll-rs) and similar in design to [rssh-rs](https://github.com/0xTriboulet/rssh-rs/tree/master), this project enables external capability to be deployed from a Beacon console, effectively providing (*very*) primitive support for 3rd-party SSH pivot agents from an existing Beacon session. Unlike `rssh-rs`, `scepter-rs` inverts the communication relationship and stands up an SSH server on the Beacon-side of the network, increasing client-side customization.
 
 ![img_4.png](img_4.png)
 
@@ -60,6 +60,8 @@ This project contains (untested/experimental) pre-built Agent binaries in the `b
 - Apple aarch64
 
 Static pre-built binaries, and binaries built from source will be placed in the `bin/` directory. Do not modify those binaries unless you're confident in what you're doing. Those binaries are used as the baseline to allow changes to be driven from the `.cna`. You can get very far with customization from the command-line and the `scepter-rs.cna`.
+
+Once setup is complete, the `scepter-rs.cna` will automatically organize the configured output binaries into the `out/` directory.
 
 #### Cobalt Strike Integration
 

@@ -80,7 +80,7 @@ pub async fn dll_main() {
 
         unsafe {
             // If we're not initialized, initialize the input pipe
-            if G_H_OUTPUT_PIPE == 0 as HANDLE {
+            if G_H_INPUT_PIPE == 0 as HANDLE {
                 G_H_INPUT_PIPE = initialize_input_pipe().unwrap_or_else(|| {
                     debug_eprintln!("Failed to initialize input pipe.");
                     TerminateThread(GetCurrentThread(), 1);
