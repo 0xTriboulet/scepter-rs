@@ -96,7 +96,10 @@ scepter-exit               (64-bit only) Uses a bof to write the exit command to
 scepter-generate-agents    (64-bit only) Builds Agent binaries with configuration specified in .cna without starting the SSH Scepter Server.
 scepter-init               (64-bit only) Initializes RDLL and BOF to start SSH Scepter Server on the target host, and builds Agents for use.
  ```
-
+Commands on the target system should be placed in quotes. For example:
+```aiignore
+beacon> scepter-exec "cd /tmp"
+```
 
 #### Applying Other Reflective Loaders
 
